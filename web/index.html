@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arboriane</title>
+  <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="/styles/style.css">
+</head>
+<body>
+  <div class="app">
+    <nav class="menu" id="menu" aria-label="Navigation principale">
+      <div class="marque">
+        <span class="marque-logo" aria-hidden="true">🌳</span>
+        <span class="marque-bloc">
+          <span class="marque-nom">Arboriane</span>
+          <span class="marque-version" id="marque-version"></span>
+        </span>
+      </div>
+      <div class="menu-recherche">
+        <input id="recherche-globale" type="search" placeholder="Rechercher…  ( / )"
+               autocomplete="off" aria-label="Recherche globale">
+      </div>
+      <div class="menu-liste" id="menu-liste"><!-- rempli par app.js --></div>
+      <div class="menu-pied">
+        <span id="indic-arbre" class="indic-arbre">Aucun arbre ouvert</span>
+        <a class="menu-cafe" href="https://buymeacoffee.com/arborianea5"
+           target="_blank" rel="noopener noreferrer"
+           title="Soutenir Arboriane — merci !">☕ Offrir un café</a>
+      </div>
+    </nav>
+    <main id="vue" class="vue"><!-- rempli par les vues --></main>
+  </div>
+  <div id="toasts" class="toasts" aria-live="assertive"></div>
+  <div id="volet-fond" class="volet-fond cache"></div>
+  <aside id="volet" class="volet cache" aria-label="Panneau latéral"></aside>
+  <div id="modale-fond" class="modale-fond cache">
+    <div id="modale" class="modale" role="dialog" aria-modal="true"></div>
+  </div>
+  <script type="module" src="/app.js"></script>
+
+  <!-- Navigateur trop ancien (sans modules ES) : message clair -->
+  <script nomodule>
+    document.body.innerHTML =
+      '<div style="max-width:540px;margin:70px auto;padding:24px;font-family:Segoe UI,system-ui,sans-serif;text-align:center;color:#2a2b28">'
+      + '<div style="font-size:46px">🌳</div>'
+      + '<h1 style="color:#1f4636;margin:6px 0">Arboriane</h1>'
+      + '<p style="font-size:17px">Ce navigateur est trop ancien pour Arboriane.</p>'
+      + '<p><b>Ouvrez Arboriane dans Google&nbsp;Chrome ou Microsoft&nbsp;Edge récent.</b></p>'
+      + '<p style="color:#6b7280">Copiez l\'adresse affichée dans la petite fenêtre Arboriane '
+      + '(http://127.0.0.1:…) et collez-la dans Chrome ou Edge.</p></div>';
+  </script>
+
+  <!-- Filet : si l'application n'a pas démarré après 4s, on guide l'utilisateur -->
+  <script>
+    setTimeout(function () {
+      var liste = document.getElementById("menu-liste");
+      if (liste && liste.children.length === 0) {
+        var v = document.getElementById("vue");
+        if (v) v.innerHTML =
+          '<div style="padding:40px;max-width:560px;font-family:system-ui,sans-serif">'
+          + '<h2 style="color:#b3541e">Arboriane n\'a pas pu démarrer ici.</h2>'
+          + '<p>Essayez d\'ouvrir l\'adresse dans <b>Google Chrome</b> ou <b>Microsoft Edge</b> récent, '
+          + 'ou faites <b>Ctrl + F5</b> pour recharger.</p></div>';
+      }
+    }, 4000);
+  </script>
+</body>
+</html>

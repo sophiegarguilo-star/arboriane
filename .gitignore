@@ -1,0 +1,29 @@
+# ── Données locales et réglages (jamais committés) ────────────────────
+# L'application écrit ici : arbres, réglages (dont d'éventuelles clés API).
+/donnees/
+/Mes arbres/
+reglages.json
+port.txt
+*.log
+
+# ── Fichiers de généalogie (données personnelles) ─────────────────────
+*.ged
+*.gedcom
+
+# ── Artefacts de build / distribution ─────────────────────────────────
+/dist/
+/build/
+*.spec
+!Arboriane.spec
+/_Archives/
+
+# ── Python ────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# ── Éditeurs / OS ─────────────────────────────────────────────────────
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

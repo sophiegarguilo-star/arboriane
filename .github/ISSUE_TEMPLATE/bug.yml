@@ -1,0 +1,54 @@
+name: "🐛 Signaler un problème"
+description: "Quelque chose ne fonctionne pas comme prévu."
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre le temps de signaler ce problème.
+
+        ⚠️ **Faille de sécurité ?** Ne l'ouvrez pas ici : écrivez à
+        **arboriane.app@gmail.com** avec « sécurité » dans l'objet.
+        Voir [SECURITY.md](../blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Version d'Arboriane
+      description: Elle s'affiche en bas de la petite fenêtre de lancement.
+      placeholder: "1.7.8"
+    validations:
+      required: true
+  - type: textarea
+    id: attendu
+    attributes:
+      label: Ce que vous attendiez, et ce qui s'est produit
+      description: Décrivez les étapes pour reproduire, et ce que vous avez vu.
+      placeholder: |
+        1. J'ai fait…
+        2. Je m'attendais à…
+        3. À la place, il s'est passé…
+    validations:
+      required: true
+  - type: input
+    id: logiciel_gedcom
+    attributes:
+      label: S'il s'agit d'un import — quel logiciel a produit le fichier GEDCOM ?
+      description: Heredis, Geneanet, Gramps, Ancestry, Family Tree Maker…
+      placeholder: "Heredis 2025"
+  - type: textarea
+    id: fichier
+    attributes:
+      label: Pouvez-vous joindre le fichier ?
+      description: |
+        Un fichier GEDCOM ou une capture d'écran aide énormément.
+        **N'envoyez jamais une généalogie contenant des personnes vivantes**
+        que vous préféreriez garder pour vous : anonymisez, ou joignez seulement
+        un extrait qui reproduit le problème.
+      placeholder: "Glissez le fichier ou l'image ici, ou décrivez pourquoi c'est impossible."
+  - type: checkboxes
+    id: verifs
+    attributes:
+      label: Avant d'envoyer
+      options:
+        - label: "J'utilise bien la dernière version d'Arboriane."
+        - label: "Le fichier joint ne contient pas de données que je souhaite garder privées."

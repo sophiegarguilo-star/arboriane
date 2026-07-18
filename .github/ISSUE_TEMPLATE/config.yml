@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "📖 Documentation (wiki)"
+    url: https://github.com/sophiegarguilo-star/arboriane/wiki
+    about: "Installation, premiers pas, import GEDCOM, dépannage."
+  - name: "🔒 Faille de sécurité"
+    url: https://github.com/sophiegarguilo-star/arboriane/blob/main/SECURITY.md
+    about: "Ne l'ouvrez PAS en public : écrivez à arboriane.app@gmail.com."
+  - name: "✉️ Écrire directement"
+    url: mailto:arboriane.app@gmail.com
+    about: "Une question qui ne rentre dans aucune case."

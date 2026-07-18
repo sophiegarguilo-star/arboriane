@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arboriane — atelier local de généalogie sourcée</title>
+<meta name="description" content="Arboriane : un atelier local et privé de généalogie sourcée. Vos documents deviennent des preuves, vos preuves des faits, vos faits une histoire familiale. Téléchargement Windows gratuit.">
+<link rel="icon" href="favicon.ico" sizes="any">
+<style>
+  :root{
+    --vert:#1f4636; --vert-clair:#2d5c47; --sauge:#8ba58d; --sauge-pale:#e4ece1;
+    --ivoire:#f7f4ec; --blanc:#fffdf8; --accent:#c76b2a; --accent-or:#d99a3c;
+    --accent-pale:#f3e4d2; --texte:#2a2b28; --gris:#5b6560; --bord:#e4e1d6;
+    --serif:Georgia,"Iowan Old Style","Palatino Linotype",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --ombre:0 1px 3px rgba(31,70,54,.07),0 10px 30px rgba(31,70,54,.08);
+    --ombre-forte:0 4px 14px rgba(31,70,54,.12),0 18px 50px rgba(31,70,54,.14);
+    --carte-bg:var(--blanc); --carte-bord:var(--bord); --page:var(--ivoire);
+    --texte-c:var(--texte); --gris-c:var(--gris);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:var(--sans);color:var(--texte-c);background:var(--page);line-height:1.62;
+    -webkit-font-smoothing:antialiased}
+  a{color:var(--accent)}
+  img{max-width:100%;height:auto;display:block}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px}
+
+  /* ── Hero ─────────────────────────────────────────────── */
+  header.hero{background:radial-gradient(1200px 500px at 78% -10%,rgba(217,154,60,.22),transparent 60%),
+    linear-gradient(135deg,var(--vert),var(--vert-clair));
+    color:#eaf3ee;padding:72px 0 66px;position:relative;overflow:hidden}
+  header.hero .wrap{position:relative;z-index:1}
+  .logo{font-size:52px;line-height:1}
+  h1{font-family:var(--serif);font-size:clamp(40px,7vw,56px);margin:.18em 0 .12em;color:#fff;font-weight:600;letter-spacing:.5px}
+  .tagline{font-size:clamp(18px,2.4vw,21px);max-width:46ch;color:#e6f2ea}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+  .badge{display:inline-block;padding:6px 14px;border-radius:999px;font-size:13.5px;font-weight:600;
+    background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);color:#eaf3ee}
+  .cta-row{display:flex;flex-wrap:wrap;gap:14px;margin-top:30px;align-items:center}
+  .cta{display:inline-flex;align-items:center;gap:9px;padding:13px 24px;border-radius:11px;
+    text-decoration:none;font-weight:700;font-size:16px;transition:transform .12s ease,background .12s ease}
+  .cta:hover{transform:translateY(-1px)}
+  .cta-primaire{background:var(--accent);color:#fff;box-shadow:0 6px 18px rgba(199,107,42,.35)}
+  .cta-primaire:hover{background:#b25e22}
+  .cta-secondaire{background:rgba(255,255,255,.10);color:#fff;border:1px solid rgba(255,255,255,.35)}
+  .cta-secondaire:hover{background:rgba(255,255,255,.18)}
+  .cta-note{margin-top:12px;font-size:13.5px;color:#bcd3c6}
+  .grain{position:absolute;right:-70px;top:-50px;font-size:360px;opacity:.06;z-index:0;
+    transform:rotate(-12deg);user-select:none;pointer-events:none}
+
+  /* ── Sections ─────────────────────────────────────────── */
+  section{padding:64px 0}
+  h2{font-family:var(--serif);color:var(--vert);font-size:clamp(26px,4vw,32px);margin:0 0 8px;line-height:1.2}
+  .kicker{text-transform:uppercase;letter-spacing:.12em;font-size:12.5px;font-weight:700;color:var(--accent);margin:0 0 10px}
+  .sous{color:var(--gris-c);max-width:62ch;margin:0 0 30px;font-size:17px}
+
+  .grille{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+  .carte{background:var(--carte-bg);border:1px solid var(--carte-bord);border-radius:16px;
+    padding:22px 22px;box-shadow:var(--ombre)}
+  .carte .ico{font-size:26px}
+  .carte h3{font-family:var(--serif);color:var(--vert);font-size:18px;margin:10px 0 6px}
+  .carte p{margin:0;color:var(--texte-c);font-size:14.5px}
+
+  /* ── Galerie captures ─────────────────────────────────── */
+  .apercu{background:linear-gradient(180deg,var(--sauge-pale),var(--ivoire) 70%)}
+  .cadre{background:var(--carte-bg);border:1px solid var(--carte-bord);border-radius:14px;overflow:hidden;
+    box-shadow:var(--ombre-forte)}
+  .cadre .barre{display:flex;align-items:center;gap:7px;padding:11px 15px;background:#eef1ec;
+    border-bottom:1px solid var(--carte-bord)}
+  .cadre .pastille{width:11px;height:11px;border-radius:50%;background:#cfd6cd}
+  .cadre .pastille.r{background:#e6a598}.cadre .pastille.j{background:#e3c489}.cadre .pastille.v{background:#a9cbad}
+  .cadre .url{margin-left:10px;font-size:12.5px;color:#7d857c;background:#fff;border:1px solid #e0e3dc;
+    border-radius:7px;padding:3px 12px}
+  .cadre img{width:100%;display:block}
+  figure{margin:0}
+  figcaption{margin-top:12px;font-size:14px;color:var(--gris-c)}
+  figcaption b{color:var(--vert);font-family:var(--serif);font-weight:600}
+  .vedette{margin-bottom:34px}
+  .galerie{display:grid;gap:30px 26px;grid-template-columns:1fr 1fr}
+  @media (max-width:760px){ .galerie{grid-template-columns:1fr} }
+
+  /* ── Confidentialité ──────────────────────────────────── */
+  .prive{background:var(--vert);color:#e7efe9}
+  .prive h2{color:#fff}.prive .kicker{color:var(--accent-or)}
+  .prive .sous{color:#b9cabf}
+  .prive .carte{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.14)}
+  .prive .carte h3{color:#fff}.prive .carte p{color:#cfdcd3}
+  .prive .carte .ico{filter:saturate(1.1)}
+  .prive code{background:rgba(255,255,255,.12);padding:1px 7px;border-radius:6px;font-size:.92em}
+
+  /* ── Télécharger / premiers pas ───────────────────────── */
+  .install{background:var(--accent-pale)}
+  .etapes{display:grid;gap:26px}
+  .etape{display:grid;grid-template-columns:56px 1fr;gap:20px;align-items:start}
+  .num{width:44px;height:44px;border-radius:50%;background:var(--vert);color:#fff;display:grid;place-items:center;
+    font-family:var(--serif);font-size:20px;font-weight:600;box-shadow:var(--ombre)}
+  .etape h3{font-family:var(--serif);color:var(--vert);font-size:20px;margin:6px 0 8px}
+  .etape p{margin:0 0 12px;color:var(--texte-c)}
+  .dl-gros{display:inline-flex;align-items:center;gap:10px;background:var(--accent);color:#fff;text-decoration:none;
+    font-weight:700;font-size:16.5px;padding:14px 26px;border-radius:12px;box-shadow:0 6px 18px rgba(199,107,42,.3)}
+  .dl-gros:hover{background:#b25e22}
+  .dl-meta{display:block;margin-top:10px;font-size:13.5px;color:var(--gris-c)}
+
+  /* Fausse fenêtre Windows (SmartScreen) */
+  .maquette{max-width:440px;border-radius:12px;overflow:hidden;box-shadow:var(--ombre-forte);
+    border:1px solid var(--bord);background:#fbfbfb;font-size:14px}
+  .ss-barre{background:#f3f3f3;padding:9px 14px;font-size:12.5px;color:#555;border-bottom:1px solid #e5e5e5;
+    display:flex;justify-content:space-between;align-items:center}
+  .ss-barre .x{color:#999}
+  .ss-corps{padding:22px 22px 20px}
+  .ss-corps h4{margin:0 0 10px;font-size:18px;color:#1b1b1b;font-family:var(--sans);font-weight:600}
+  .ss-corps p{margin:0 0 6px;color:#333;font-size:13.5px;line-height:1.5}
+  .ss-lien{color:#2864b6;font-size:13.5px}
+  .ss-appli{margin:12px 0 4px;font-size:13px;color:#555}
+  .ss-appli b{color:#1b1b1b}
+  .ss-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+  .ss-btn{padding:8px 18px;border-radius:4px;font-size:13.5px;border:1px solid #cfcfcf;background:#e9e9e9;color:#222;cursor:default}
+  .ss-btn.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+
+  /* Fenêtre de lancement Arboriane */
+  .lanceur{max-width:340px;border-radius:12px;overflow:hidden;box-shadow:var(--ombre-forte);border:1px solid #e7e2d4}
+  .lanceur .titre{background:#efeadd;padding:8px 14px;font-size:12.5px;color:#6a6350;display:flex;justify-content:space-between;align-items:center}
+  .lanceur .corps{background:#fbfaf5;padding:26px 30px 22px;text-align:center}
+  .lanceur .emb{font-size:40px;line-height:1}
+  .lanceur .nom{font-family:var(--serif);font-size:22px;color:var(--vert);margin:4px 0 2px}
+  .lanceur .acc{font-style:italic;font-size:12.5px;color:#5c6f60;margin:0 0 16px}
+  .lanceur .etat{display:inline-flex;align-items:center;gap:8px;background:#eef5ef;border:1px solid #d6e6da;
+    border-radius:8px;padding:7px 14px;font-size:12.5px;color:#2f5c47}
+  .lanceur .etat .pt{color:#3d7a54;font-size:11px}
+  .lanceur .bouton{margin-top:16px;background:var(--vert);color:#fff;border-radius:8px;padding:11px;font-weight:700;font-size:14px}
+  .lanceur .quitter{margin-top:9px;background:#efece3;color:#3a4a40;border-radius:8px;padding:9px;font-size:13px}
+  .lanceur .pied{margin-top:14px;font-size:10.5px;color:#9a9384}
+
+  .astuce{margin-top:14px;background:rgba(255,255,255,.6);border:1px solid var(--bord);border-radius:10px;
+    padding:13px 16px;font-size:14px;color:var(--texte-c)}
+  .astuce b{color:var(--vert)}
+
+  /* ── Footer ───────────────────────────────────────────── */
+  footer{background:#16261e;color:#cfe2d7;padding:38px 0;font-size:14px}
+  footer a{color:#f0c39a}
+  .footer-row{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center}
+
+  @media (max-width:640px){
+    section{padding:48px 0}
+    .etape{grid-template-columns:1fr;gap:8px}
+    .num{margin-bottom:4px}
+  }
+
+  /* ── Thème sombre ─────────────────────────────────────── */
+  @media (prefers-color-scheme:dark){
+    :root{--page:#14201b;--texte-c:#e6ece8;--gris-c:#a9b6af;--carte-bg:#1c2b24;--carte-bord:#2c3f36}
+    .apercu{background:linear-gradient(180deg,#182420,#14201b 70%)}
+    .cadre{border-color:#2c3f36}
+    .cadre .barre{background:#16211c;border-color:#2c3f36}
+    .cadre .url{background:#0f1814;border-color:#2c3f36;color:#9fb0a6}
+    .install{background:#20180f}
+    .astuce{background:rgba(255,255,255,.04);border-color:#3a3226}
+    h2{color:#eafff2}.etape h3,.carte h3{color:#dff0e6}
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════ HERO ══════════ -->
+<header class="hero">
+  <div class="grain">🌳</div>
+  <div class="wrap">
+    <div class="logo">🌳</div>
+    <h1>Arboriane</h1>
+    <p class="tagline">Un atelier <strong>local</strong> et <strong>privé</strong> de
+      généalogie sourcée. Vos documents deviennent des preuves, vos preuves des faits,
+      vos faits une histoire familiale à transmettre.</p>
+    <div class="badges">
+      <span class="badge">100 % local</span>
+      <span class="badge">Sans cloud obligatoire</span>
+      <span class="badge">Sans télémétrie</span>
+      <span class="badge">GEDCOM 5.5.1</span>
+      <span class="badge">Gratuit</span>
+    </div>
+    <div class="cta-row">
+      <!-- Lien STABLE : /releases/latest/download/Installer-Arboriane.exe pointe toujours vers la dernière Release (aucune MAJ par version). L'asset doit garder le nom fixe Installer-Arboriane.exe (voir installateur.iss). -->
+      <a class="cta cta-primaire" href="https://github.com/sophiegarguilo-star/arboriane/releases/latest/download/Installer-Arboriane.exe">⬇ Télécharger pour Windows</a>
+      <a class="cta cta-secondaire" href="#telecharger">Comment ça s'installe ?</a>
+    </div>
+    <p class="cta-note">Windows · gratuit · ≈ 13 Mo · version <span class="version-arboriane">1.9.10</span> &nbsp;·&nbsp;
+      <a href="https://github.com/sophiegarguilo-star/arboriane" style="color:#f0c39a">code source sur GitHub</a></p>
+    <!-- Le dire franchement vaut mieux que laisser Windows le dire à notre place. -->
+    <p class="cta-note" style="margin-top:6px">L'installateur n'est pas signé : Windows affichera
+      « éditeur inconnu ». Vous pouvez vérifier son empreinte SHA-256, publiée avec
+      <a href="https://github.com/sophiegarguilo-star/arboriane/releases/latest" style="color:#f0c39a">chaque version</a>.</p>
+  </div>
+</header>
+
+<!-- ══════════ CE QUE FAIT ARBORIANE ══════════ -->
+<section id="fonctions">
+  <div class="wrap">
+    <p class="kicker">Ce que fait Arboriane</p>
+    <h2>De la pièce d'archive à l'histoire transmissible</h2>
+    <p class="sous">Une chaîne complète pour bâtir un arbre <em>sourcé</em> — chaque écran pensé
+      pour prouver ce que vous avancez et garder le contrôle de vos données.</p>
+    <div class="grille">
+      <div class="carte"><div class="ico">👥</div><h3>Personnes &amp; fiches</h3>
+        <p>Fiches riches, chronologie de vie, cellule familiale complète (parents, unions,
+          fratrie) et ajout guidé d'un proche sur la même fiche détaillée — portraits et
+          recherche web pré-remplie qui n'envoie aucune donnée de l'arbre.</p></div>
+      <div class="carte"><div class="ico">📄</div><h3>Sources &amp; preuves</h3>
+        <p>Le cœur d'Arboriane : chaque fait est <em>prouvé par acte</em>, <em>déclaré</em>
+          ou <em>à prouver</em>. Sources typées, citations qualifiées, visionneuse d'actes,
+          dépôts d'archives — et une même source qui relie d'un geste toutes les
+          personnes qu'elle cite (enfant et parents, foyer d'un recensement).</p></div>
+      <div class="carte"><div class="ico">🌳</div><h3>Arbre</h3>
+        <p>Éventail, ascendance, descendance, tableau par génération — personnalisables —
+          et une mosaïque A4 / A3 / A0 pour l'afficher au mur.</p></div>
+      <div class="carte"><div class="ico">🗺️</div><h3>Lieux &amp; carte</h3>
+        <p>Carte des lieux (géocodage optionnel) et référentiel hiérarchique avec noms
+          datés — une commune ou un pays seul restent valides.</p></div>
+      <div class="carte"><div class="ico">🧭</div><h3>Analyse</h3>
+        <p>Sosa, parenté, implexe, consanguinité, numérotation d'Aboville, chronologie
+          multi-personnes et contemporains.</p></div>
+      <div class="carte"><div class="ico">🩺</div><h3>Qualité de l'arbre</h3>
+        <p>Cohérence, santé de l'arbre, qualité des sources, plan de recherche par dépôt,
+          fusion assistée des doublons.</p></div>
+      <div class="carte"><div class="ico">📋</div><h3>Listes &amp; carnet</h3>
+        <p>Index des métiers, unions, ascendance/descendance, éphéméride (exportables),
+          favoris, ensembles et carnet de bord.</p></div>
+      <div class="carte"><div class="ico">🔄</div><h3>GEDCOM</h3>
+        <p>Import / export 5.5.1 fidèle, encodages, dates, calendrier républicain, et un
+          export autoporteur (images embarquées).</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ EN IMAGES ══════════ -->
+<section class="apercu">
+  <div class="wrap">
+    <p class="kicker">En images</p>
+    <h2>Une visite, sans rien installer</h2>
+    <p class="sous">Toutes les images ci-dessous sont de vraies captures d'écran d'Arboriane,
+      ici sur la famille de démonstration — 100 % fictive.</p>
+
+    <figure class="vedette">
+      <div class="cadre">
+        <div class="barre"><span class="pastille r"></span><span class="pastille j"></span><span class="pastille v"></span>
+          <span class="url">127.0.0.1 · Arboriane</span></div>
+        <img src="captures/tableau.png" alt="Tableau de bord d'Arboriane" loading="lazy">
+      </div>
+      <figcaption><b>Le tableau de bord.</b> Un point de départ qui vous guide par vos gestes :
+        j'ajoute une personne, je prouve un fait, je suis une piste, je prépare une publication.</figcaption>
+    </figure>
+
+    <div class="galerie">
+      <figure>
+        <div class="cadre">
+          <div class="barre"><span class="pastille r"></span><span class="pastille j"></span><span class="pastille v"></span>
+            <span class="url">Arbre · éventail</span></div>
+          <img src="captures/arbre-eventail.png" alt="Arbre généalogique en éventail" loading="lazy">
+        </div>
+        <figcaption><b>L'arbre en éventail.</b> Numéros Sosa, couleurs par sexe, entièrement
+          personnalisable, exportable et imprimable en grand format.</figcaption>
+      </figure>
+
+      <figure>
+        <div class="cadre">
+          <div class="barre"><span class="pastille r"></span><span class="pastille j"></span><span class="pastille v"></span>
+            <span class="url">Fiche · sources &amp; preuves</span></div>
+          <img src="captures/sources.png" alt="Fiche personne avec ses sources et preuves" loading="lazy">
+        </div>
+        <figcaption><b>Sources &amp; preuves.</b> Un acte relié à une personne, et l'état de
+          chaque fait : prouvé, déclaré, ou à prouver. La généalogie qui se démontre.</figcaption>
+      </figure>
+
+      <figure>
+        <div class="cadre">
+          <div class="barre"><span class="pastille r"></span><span class="pastille j"></span><span class="pastille v"></span>
+            <span class="url">Arbre · ascendance</span></div>
+          <img src="captures/arbre-ascendance.png" alt="Arbre d'ascendance" loading="lazy">
+        </div>
+        <figcaption><b>L'ascendance.</b> Un rendu clair, génération par génération, avec
+          portraits ou monogrammes sur les cartes.</figcaption>
+      </figure>
+
+      <figure>
+        <div class="cadre">
+          <div class="barre"><span class="pastille r"></span><span class="pastille j"></span><span class="pastille v"></span>
+            <span class="url">Statistiques</span></div>
+          <img src="captures/statistiques.png" alt="Statistiques de l'arbre" loading="lazy">
+        </div>
+        <figcaption><b>Les statistiques.</b> Complétude, naissances par siècle, patronymes et
+          prénoms les plus portés, âge médian… votre arbre en un coup d'œil.</figcaption>
+      </figure>
+
+      <figure>
+        <div class="cadre">
+          <div class="barre"><span class="pastille r"></span><span class="pastille j"></span><span class="pastille v"></span>
+            <span class="url">Lieux · carte</span></div>
+          <img src="captures/lieux.jpg" alt="Carte des lieux de l'arbre" loading="lazy">
+        </div>
+        <figcaption><b>Lieux &amp; carte.</b> Le géocodage (optionnel, désactivé par défaut)
+          place vos lieux sur la carte — seuls des noms de communes sont envoyés.</figcaption>
+      </figure>
+
+      <figure>
+        <div class="cadre">
+          <div class="barre"><span class="pastille r"></span><span class="pastille j"></span><span class="pastille v"></span>
+            <span class="url">Santé de l'arbre</span></div>
+          <img src="captures/sante.png" alt="Santé de l'arbre" loading="lazy">
+        </div>
+        <figcaption><b>Santé de l'arbre.</b> Ce qu'il reste à prouver ou à compléter, classé
+          par priorité — pour avancer une preuve à la fois.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ CONFIDENTIALITÉ ══════════ -->
+<section class="prive">
+  <div class="wrap">
+    <p class="kicker">Vie privée</p>
+    <h2>Vos données restent chez vous</h2>
+    <p class="sous">La confidentialité n'est pas une case cochée après coup : c'est
+      l'architecture même de l'application.</p>
+    <div class="grille">
+      <div class="carte"><div class="ico">🔒</div><h3>Sur votre machine</h3>
+        <p>Le serveur n'écoute que sur <code>127.0.0.1</code>. Rien ne sort de
+          l'ordinateur sans un geste explicite de votre part.</p></div>
+      <div class="carte"><div class="ico">🗂️</div><h3>Un arbre = un dossier</h3>
+        <p>Tout est réuni dans un dossier autonome, avec sauvegardes horodatées
+          automatiques avant les actions sensibles.</p></div>
+      <div class="carte"><div class="ico">🌱</div><h3>Formats ouverts</h3>
+        <p>GEDCOM standard et fichiers lisibles : vos données vous appartiennent et
+          restent portables, aujourd'hui comme demain.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ TÉLÉCHARGER & PREMIERS PAS ══════════ -->
+<section class="install" id="telecharger">
+  <div class="wrap">
+    <p class="kicker">Installer sur Windows</p>
+    <h2>Télécharger &amp; premiers pas</h2>
+    <p class="sous">Pas besoin de connaître GitHub : trois clics suffisent. On vous accompagne,
+      y compris pour l'avertissement bien connu de Windows.</p>
+
+    <div class="etapes">
+
+      <div class="etape">
+        <div class="num">1</div>
+        <div>
+          <h3>Télécharger l'application</h3>
+          <p>Cliquez sur le bouton : votre navigateur télécharge un fichier nommé
+            <b>Installer-Arboriane.exe</b>. Une fois terminé, double-cliquez dessus.</p>
+          <a class="dl-gros" href="https://github.com/sophiegarguilo-star/arboriane/releases/latest/download/Installer-Arboriane.exe">⬇ Télécharger Arboriane</a>
+          <span class="dl-meta">Windows 10 / 11 · ≈ 13 Mo · gratuit · installation sans droits administrateur ·
+            <a href="https://github.com/sophiegarguilo-star/arboriane/releases/latest">toutes les versions</a></span>
+        </div>
+      </div>
+
+      <div class="etape">
+        <div class="num">2</div>
+        <div>
+          <h3>« Windows a protégé votre ordinateur » : c'est normal</h3>
+          <p>Comme Arboriane est une petite application indépendante, Windows affiche parfois
+            cet écran bleu. Ce n'est pas une alerte de virus : Windows signale simplement une
+            application qu'il ne « connaît » pas encore. Cliquez sur
+            <b>Informations complémentaires</b>, puis sur <b>Exécuter quand même</b>.</p>
+          <div class="maquette" role="img" aria-label="Fenêtre Windows : Windows a protégé votre ordinateur, avec les boutons Informations complémentaires et Exécuter quand même">
+            <div class="ss-barre"><span>Windows</span><span class="x">✕</span></div>
+            <div class="ss-corps">
+              <h4>Windows a protégé votre ordinateur</h4>
+              <p>Microsoft Defender SmartScreen a empêché le démarrage d'une application non
+                reconnue. L'exécution de cette application peut présenter un risque pour votre PC.</p>
+              <p class="ss-lien">Informations complémentaires</p>
+              <p class="ss-appli">Application&nbsp;: <b>Installer-Arboriane.exe</b><br>Éditeur&nbsp;: inconnu</p>
+              <div class="ss-btns">
+                <span class="ss-btn on">Exécuter quand même</span>
+                <span class="ss-btn">Ne pas exécuter</span>
+              </div>
+            </div>
+          </div>
+          <div class="astuce">💡 <b>Pourquoi cet avertissement&nbsp;?</b> Faire « signer » une
+            application coûte cher chaque année. Arboriane étant gratuite et sans publicité,
+            elle n'est pas signée — mais son code est <a href="https://github.com/sophiegarguilo-star/arboriane">public et vérifiable</a>.</div>
+        </div>
+      </div>
+
+      <div class="etape">
+        <div class="num">3</div>
+        <div>
+          <h3>La petite fenêtre de lancement</h3>
+          <p>Après l'installation, Arboriane place un raccourci sur le Bureau et dans le menu
+            Démarrer. À l'ouverture, cette petite fenêtre apparaît, puis l'application s'affiche
+            dans votre navigateur. <b>Gardez-la ouverte</b> tant que vous travaillez ; le bouton
+            <b>Quitter</b> ferme proprement l'application.</p>
+          <div class="lanceur" role="img" aria-label="Fenêtre de lancement d'Arboriane avec le bouton Ouvrir Arboriane">
+            <div class="titre"><span>🌳 Arboriane</span><span>—  ✕</span></div>
+            <div class="corps">
+              <div class="emb">🌳</div>
+              <div class="nom">Arboriane</div>
+              <p class="acc">Votre atelier de généalogie, local et privé</p>
+              <div class="etat"><span class="pt">●</span> Prêt · http://127.0.0.1:8770/</div>
+              <div class="bouton">Ouvrir Arboriane</div>
+              <div class="quitter">Quitter</div>
+              <div class="pied">100 % local · arboriane.app@gmail.com</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="etape">
+        <div class="num">4</div>
+        <div>
+          <h3>Découvrir avec l'arbre de démonstration</h3>
+          <p>Au premier lancement, choisissez <b>Juste découvrir</b> pour ouvrir une famille
+            100 % fictive de près de 90 personnes sur douze générations — sources, actes, dépôts,
+            carte, portraits. De quoi explorer chaque écran sans toucher à vos propres données.
+            Quand vous êtes prêt·e : <b>J'ai déjà un arbre</b> (importer un GEDCOM) ou
+            <b>Je pars de zéro</b>.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ FOOTER ══════════ -->
+<footer>
+  <div class="wrap footer-row">
+    <div>🌳 <strong>Arboriane</strong> — atelier local de généalogie sourcée</div>
+    <div>Contact : <a href="mailto:arboriane.app@gmail.com">arboriane.app@gmail.com</a>
+      &nbsp;·&nbsp; <a href="https://github.com/sophiegarguilo-star/arboriane">GitHub</a>
+      &nbsp;·&nbsp; © 2026 Sophie Garguilo &nbsp;·&nbsp;
+      <a href="https://github.com/sophiegarguilo-star/arboriane/blob/main/LICENSE">Licence AGPL v3</a></div>
+  </div>
+</footer>
+
+<script>
+  /* Numéro de version toujours à jour : on lit la dernière Release publiée.
+     Repli silencieux sur le numéro écrit en dur (hors ligne / quota API). */
+  fetch("https://api.github.com/repos/sophiegarguilo-star/arboriane/releases/latest")
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d || !d.tag_name) return;
+      var v = String(d.tag_name).replace(/^v/i, "");
+      var els = document.querySelectorAll(".version-arboriane");
+      for (var i = 0; i < els.length; i++) els[i].textContent = v;
+    })
+    .catch(function () { /* on garde le numéro figé */ });
+</script>
+</body>
+</html>

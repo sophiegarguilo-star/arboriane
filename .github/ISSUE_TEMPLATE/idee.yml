@@ -1,0 +1,22 @@
+name: "💡 Proposer une idée"
+description: "Une fonctionnalité ou une amélioration."
+labels: ["idée"]
+body:
+  - type: textarea
+    id: besoin
+    attributes:
+      label: Quel besoin cette idée résout-elle ?
+      description: Racontez la situation concrète, avant la solution.
+      placeholder: "Quand je fais…, j'aimerais pouvoir… parce que…"
+    validations:
+      required: true
+  - type: textarea
+    id: idee
+    attributes:
+      label: Ce que vous imaginez
+      description: Comment cela pourrait-il fonctionner ? (facultatif)
+  - type: markdown
+    attributes:
+      value: |
+        Arboriane est **locale, privée, gratuite et sans dépendance externe** :
+        les idées qui préservent ces principes ont toutes leurs chances.

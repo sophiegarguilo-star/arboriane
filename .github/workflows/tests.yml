@@ -1,0 +1,74 @@
+# Filet automatique : rien ne repose sur le fait qu'on ait « pensé » à lancer
+# les tests. Ils tournent à chaque poussée et à chaque proposition de fusion.
+#
+# Le corpus GEDCOM (gitignore/echantillons) n'est pas versionné : ce sont les
+# fichiers d'autres personnes. Le banc n'est donc pas joué ici — il l'est par la
+# barrière du déployeur, sur la machine qui publie, où le corpus existe.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:      # pour relancer à la main depuis GitHub
+
+jobs:
+  suites:
+    # Arboriane est une application Windows : on la teste là où elle vit.
+    # Le verrou d'instance et les chemins de fichiers en dépendent.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Bibliothèque standard uniquement
+        shell: pwsh
+        run: |
+          if (Test-Path requirements.txt) {
+            Write-Error "Arboriane n'a aucune dépendance : requirements.txt ne devrait pas exister."
+            exit 1
+          }
+          python -c "import sys; print('Python', sys.version)"
+
+      - name: Suites de tests
+        shell: pwsh
+        env:
+          ARBORIANE_SANS_NAVIGATEUR: "1"
+          ARBORIANE_MULTI: "1"      # plusieurs bancs en parallèle : pas de verrou d'instance
+        run: |
+          $echecs = 0
+          Get-ChildItem tests\test_*.py | ForEach-Object {
+            Write-Host "── $($_.Name)"
+            python -X utf8 $_.FullName
+            if ($LASTEXITCODE -ne 0) { $echecs++; Write-Host "   ÉCHEC" }
+          }
+          Write-Host "`nsuites en échec : $echecs"
+          if ($echecs -ne 0) { exit 1 }
+
+      - name: Tests JavaScript (noyau frontend)
+        shell: pwsh
+        run: |
+          $fichiers = Get-ChildItem tests\js\test_*.mjs | ForEach-Object { $_.FullName }
+          node --test $fichiers
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: CHANGELOG.md est-il à jour ?
+        shell: pwsh
+        run: python -X utf8 outils/generer_changelog.py --verifier
+
+      - name: La version est-elle cohérente ?
+        shell: pwsh
+        run: |
+          $v = python -X utf8 -c "from core.version import VERSION; print(VERSION)"
+          if ($v -notmatch '^\d+\.\d+\.\d+$') {
+            Write-Error "VERSION « $v » n'est pas au format MAJEUR.MINEUR.CORRECTIF."
+            exit 1
+          }
+          Write-Host "version $v"
