@@ -135,7 +135,7 @@ def _descendance(donnees, ident, generations, o):
         trait_c = _couleur_preuve(donnees, uid) if avec_preuves else trait
         nom = _nom_affiche(ind, o["prenoms"])
         parts.append('<g class="indi" data-id="%s"%s><title>%s</title>'
-                     % (uid, ' data-root="1"' if root else "", _echap(nom)))
+                     % (uid, ' data-root="1"' if root else "", _titre_carte(ind)))
         parts.append('<rect x="%g" y="%g" width="%g" height="%g" rx="8" fill="%s" '
                      'stroke="%s" stroke-width="%g"/>'
                      % (px, py, card_w, card_h, fondc, trait_c,

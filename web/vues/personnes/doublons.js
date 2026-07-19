@@ -30,7 +30,7 @@ export async function ouvrirDoublons() {
             try {
               await apiJson("/api/individus/fusionner", "POST", { garde: p.a, absorbe: p.b });
               toast("Fusion effectuée."); fermerVolet(); aller("personnes");
-            } catch (e) { toast(e.message); }
+            } catch (e) { toast(e.message, { type: "erreur" }); }
           } }, "Fusionner"),
           h("button", { class: "bouton secondaire petit",
             onclick: () => { fermerVolet(); aller("personnes", { fiche: p.a }); } }, "Voir A"),

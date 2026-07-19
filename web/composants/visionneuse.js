@@ -105,7 +105,7 @@ export function ouvrirVisionneuse(images, opts = {}) {
           setTimeout(() => {
             btnSave.textContent = "Enregistrer la transcription"; btnSave.disabled = false;
           }, 1800);
-        } catch (e) { btnSave.disabled = false; toast(e.message || "Échec de l'enregistrement."); }
+        } catch (e) { btnSave.disabled = false; toast(e.message || "Échec de l'enregistrement.", { type: "erreur" }); }
       } }, "Enregistrer la transcription");
     }
     const actions = btnSave ? h("div", { class: "barre-actions" }, btnSave) : null;

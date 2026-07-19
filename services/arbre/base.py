@@ -70,6 +70,21 @@ def _cale(texte, dispo_px, fs, gras=False):
     return _cale_l(_larg_txt(texte, fs, gras), dispo_px)
 
 
+def _titre_carte(ind, suffixe=""):
+    """Contenu du ``<title>`` d'une carte cliquable : « Nom (période) », déjà
+    échappé XML. Lu par les lecteurs d'écran et affiché en info-bulle native
+    du navigateur — point COMMUN à tous les rendus (éventail, ascendance,
+    descendance, sablier) pour ne pas dupliquer la logique.
+    ``suffixe`` : mention libre ajoutée à la fin (ex. renvoi d'implexe)."""
+    if not ind:
+        return _echap("?")
+    titre = modele.nom_complet(ind)
+    periode = modele.periode(ind)
+    if periode:
+        titre += " (%s)" % periode
+    return _echap(titre + (suffixe or ""))
+
+
 def _profession(ind):
     """Première profession d'une personne, en chaîne (schéma professions[{valeur}])."""
     profs = ind.get("professions") or []
@@ -399,7 +414,8 @@ __all__ = [
     "IMPLEXE_FOND", "IMPLEXE_TRAIT", "IMPLEXE_TEXTE",
     "_implexe_repeats", "_elaguer_implexe",
     "_PALETTE_GEN", "COULEUR_PREUVE", "_ORDRE_PREUVE", "_couleur_secteur",
-    "_echap", "_tronque", "_larg_txt", "_cale_l", "_cale", "_profession",
+    "_echap", "_tronque", "_larg_txt", "_cale_l", "_cale", "_titre_carte",
+    "_profession",
     "_prenom_principal", "_niveau_preuve_global", "_couleur_preuve",
     "_media_principal", "_url_photo", "_parents", "_ascendance_sosa",
     "_descendance_couples", "_couleur_carte", "_MONO_BG", "_MONO_TX",

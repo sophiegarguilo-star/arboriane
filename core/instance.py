@@ -113,6 +113,8 @@ def ecrire_infos(dossier_donnees, infos):
         tmp = _chemin(dossier_donnees, NOM_INFOS) + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(infos, f, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())     # vraiment sur le disque avant le replace
         os.replace(tmp, _chemin(dossier_donnees, NOM_INFOS))
     except OSError:
         pass

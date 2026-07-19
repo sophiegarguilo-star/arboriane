@@ -1,6 +1,6 @@
 // Onglet Arbre — éventail / ascendance / descendance en SVG, avec un panneau
 // de personnalisation complet (persisté). Clic sur une case → fiche.
-import { h, vider } from "../noyau/dom.js";
+import { h, vider, actionnable } from "../noyau/dom.js";
 import { aller, etat, majEspace } from "../noyau/etat.js";
 import { apiGet, apiJson } from "../noyau/api.js";
 import { champPersonne } from "../composants/champ.js";
@@ -145,8 +145,8 @@ export async function vueArbre(vue, arg) {
     if (!f) { aller("personnes", { fiche: id }); return; }
     const conjoints = f.unions.map((u) => u.conjoint).filter(Boolean);
     const enfants = f.unions.flatMap((u) => u.enfants);
-    const puce = (p) => p ? h("span", { class: "puce-pers", onclick: () => recentrer(p.id) },
-      pastilleSexe(p.sexe), p.nom + (p.periode ? " · " + p.periode : "")) : null;
+    const puce = (p) => p ? actionnable(h("span", { class: "puce-pers", onclick: () => recentrer(p.id) },
+      pastilleSexe(p.sexe), p.nom + (p.periode ? " · " + p.periode : ""))) : null;
     const groupe = (titre, arr) => arr.length
       ? h("div", { class: "rel-groupe" }, h("h3", {}, titre), ...arr.map(puce)) : null;
     const ligneInfo = (lib, val) => val ? h("div", { class: "def-ligne" },
@@ -205,7 +205,21 @@ export async function vueArbre(vue, arg) {
         const id = el.getAttribute("data-id");
         const so = el.getAttribute("data-sosa");
         el.style.cursor = "pointer";
-        el.addEventListener("click", () => { if (!aBouge) ouvrirMiniFiche(id, so ? +so : null); });
+        // Accessibilité clavier (A11Y-02) : chaque carte est focusable au Tab et
+        // se comporte comme un bouton — Entrée ou Espace = même action que le
+        // clic (ouvrir la mini-fiche). Le focus visible est assuré par le CSS
+        // global ([tabindex]:focus-visible) ; le <title> du SVG sert d'intitulé
+        // aux lecteurs d'écran.
+        el.setAttribute("tabindex", "0");
+        el.setAttribute("role", "button");
+        const ouvrir = () => ouvrirMiniFiche(id, so ? +so : null);
+        el.addEventListener("click", () => { if (!aBouge) ouvrir(); });
+        el.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+            e.preventDefault();   // Espace ne doit pas faire défiler la zone
+            ouvrir();
+          }
+        });
         el.addEventListener("mousemove", (e) => montrerInfobulle(e, id));
         el.addEventListener("mouseleave", () => { infobulle.style.display = "none"; });
       });
@@ -262,7 +276,7 @@ export async function vueArbre(vue, arg) {
         await majEspace(apiGet);
         toast("Personne de l'arbre définie.");
         majEtoile();
-      } catch (e) { toast(e.message); }
+      } catch (e) { toast(e.message, { type: "erreur" }); }
     } }, "⭐ Définir comme personne de l'arbre");
 
   let panneauVisible = false;

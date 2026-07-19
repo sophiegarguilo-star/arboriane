@@ -4,6 +4,7 @@ from core import modele
 from core.gedcom.commun import *
 from core.gedcom.champs import *
 from core.gedcom.lecture_records import lire_indi, lire_fam, lire_sour
+from core.gedcom.bilan import compter_arbre
 
 def _version_declaree(arbre):
     """Version annoncée par l'en-tête : HEAD.GEDC.VERS. « » si absente.
@@ -222,6 +223,16 @@ def importer(texte):
     # perdus si un FAM les omettait. On complète, on ne remplace jamais.
     liens_ignores = _reconcilier_parente(individus, familles)
 
+    # Type de filiation (FAMC.PEDI/STAT lus sur l'INDI, transportés dans
+    # ind["_pedi"]) : reversé côté FAMILLE — fam["pedi"] = {enfant: type},
+    # absence = naissance. Le PEDI de l'INDI (standard) écrase un éventuel
+    # _FREL/_MREL (privé) déjà posé par lire_fam.
+    for pid, ind in individus.items():
+        for fid, typ in (ind.pop("_pedi", None) or {}).items():
+            fam = familles.get(fid)
+            if fam and pid in fam["enfants"]:
+                fam.setdefault("pedi", {})[pid] = typ
+
     # Sources EN LIGNE (1 SOUR <texte>) -> vraies sources. Geneanet et les sites
     # GeneWeb aplatissent une source structurée en une phrase collée sur la
     # personne. Sans ceci, la citation garderait ce texte comme identifiant et
@@ -300,7 +311,12 @@ def importer(texte):
         # cas l'utilisateur doit le savoir : un import muet qui perd la parenté
         # est pire qu'un import qui échoue.
         "meta": {"source": "import GEDCOM", "liens_ignores": liens_ignores,
-                 "version_fichier": version_fichier},
+                 "version_fichier": version_fichier,
+                 # Balises niveau 1-2 NON RECONNUES à la lecture (par tag, hors
+                 # administratif trivial) : de l'information du fichier qui n'a
+                 # pas été reprise. L'utilisateur doit le savoir — et garder son
+                 # fichier d'origine (cf. web/composants/bilanImport.js).
+                 "balises_non_lues": compter_arbre(arbre)},
     }
     return franciser_dates(modele.garantir_cles(donnees))
 

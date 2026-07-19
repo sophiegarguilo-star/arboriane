@@ -1,12 +1,12 @@
 // Tableau de bord — le PREMIER écran. Trois états selon l'arbre ouvert.
-import { h } from "../noyau/dom.js";
+import { h, actionnable } from "../noyau/dom.js";
 import { aller, majEspace } from "../noyau/etat.js";
 import { apiGet, apiJson } from "../noyau/api.js";
 import { lireOctetsB64 } from "../noyau/octets.js";
 import { toast } from "../composants/toast.js";
 import { demander } from "../composants/modale.js";
 import { bilanImport } from "../composants/bilanImport.js";
-import { confirmerVerrou } from "./espace.js";
+import { confirmerVerrou, bandeauCorrompu } from "./espace.js";
 import { lireRecents } from "../noyau/recents.js";
 
 function grandBouton(emoji, titre, desc, onclick) {
@@ -34,7 +34,7 @@ async function creerArbreVide() {
     await majEspace(apiGet);
     toast("Arbre « " + nom + " » créé.");
     aller("accueil");
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(e.message, { type: "erreur" }); }
 }
 
 // « J'ai déjà un arbre » : importer un GEDCOM QUI CRÉE un nouvel arbre.
@@ -58,7 +58,7 @@ function importerNouvelArbre() {
       toast("Arbre « " + nom + " » — " + bilan.texte,
             bilan.alerte ? { duree: 12000 } : undefined);
       aller("accueil");
-    } catch (e) { toast(e.message, { duree: 6000 }); }
+    } catch (e) { toast(e.message, { type: "erreur", duree: 6000 }); }
   });
   document.body.append(input);
   input.click();
@@ -128,7 +128,7 @@ async function reprendre(chemin) {
     await majEspace(apiGet);
     toast("Arbre « " + r.nom + " » ouvert.");
     aller("accueil");
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(e.message, { type: "erreur" }); }
 }
 
 // ── État 2 : arbre ouvert mais vide ─────────────────────────────────────
@@ -219,9 +219,9 @@ function portraitHero(ref) {
 }
 
 function kpi(emoji, fond, n, label, onclick) {
-  return h("div", { class: "kpi" + (onclick ? " cliquable" : ""), onclick: onclick || null },
+  return actionnable(h("div", { class: "kpi" + (onclick ? " cliquable" : ""), onclick: onclick || null },
     h("div", { class: "kpi-ico", style: "background:" + fond }, emoji),
-    h("div", {}, h("strong", {}, String(n)), h("span", {}, label)));
+    h("div", {}, h("strong", {}, String(n)), h("span", {}, label))));
 }
 
 function barre(pct, couleur) {
@@ -264,10 +264,10 @@ function carteRecents() {
     return carte;
   }
   const box = h("div", { class: "liste-pers compacte" });
-  recents.slice(0, 6).forEach((p) => box.append(h("div", {
+  recents.slice(0, 6).forEach((p) => box.append(actionnable(h("div", {
     class: "ligne-pers", onclick: () => aller("personnes", { fiche: p.id }) },
     h("span", { class: "nom" }, p.nom),
-    h("span", { class: "meta" }, p.periode || "—"))));
+    h("span", { class: "meta" }, p.periode || "—")))));
   carte.append(box);
   return carte;
 }
@@ -294,12 +294,15 @@ async function sauvegarder() {
   try {
     const r = await apiJson("/api/espaces/sauvegarde", "POST", {});
     toast("Sauvegarde créée : " + r.fichier);
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(e.message, { type: "erreur" }); }
 }
 
 export async function vueTableau(vue) {
   const esp = await majEspace(apiGet);
   if (!esp || !esp.ouvert) return accueilVierge(vue);
+  // DAT-03 : le fichier de l'arbre était illisible au chargement (mis en
+  // quarantaine, base repartie de zéro) — le dire clairement, dès l'accueil.
+  if (esp.avertissement === "corrompu") vue.append(bandeauCorrompu());
   if (!esp.personnes) return accueilVide(vue, esp);
   return accueilRempli(vue, esp);
 }

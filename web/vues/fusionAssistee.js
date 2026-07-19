@@ -52,7 +52,7 @@ async function chargerPersonnes(zone) {
 async function assistant(p) {
   let c;
   try { c = await apiGet("/api/fusion/comparer?a=" + p.a + "&b=" + p.b); }
-  catch (e) { toast(e.message); return; }
+  catch (e) { toast(e.message, { type: "erreur" }); return; }
   let garde = "a";                            // on garde A par défaut (permutable)
   const contenu = h("div", {});
 
@@ -109,7 +109,7 @@ async function lancerFusion(garde, absorbe, choix, forcer) {
       if (ok) return lancerFusion(garde, absorbe, choix, true);
       return;
     }
-    toast(e.message);
+    toast(e.message, { type: "erreur" });
   }
 }
 
@@ -144,7 +144,7 @@ async function chargerLieux(zone) {
         try {
           const r = await apiJson("/api/fusion/lieux", "POST", { canonique: canon, absorbes });
           toast(r.modifies + " occurrence(s) réécrite(s) vers « " + canon + " »."); aller("fusion");
-        } catch (e) { toast(e.message); }
+        } catch (e) { toast(e.message, { type: "erreur" }); }
       } }, "Fusionner ces variantes")));
     zone.append(carte);
   });

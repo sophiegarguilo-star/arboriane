@@ -8,7 +8,7 @@ import threading
 
 from core import modele
 
-__all__ = ["_GEDCOM_LOCK", "_serialise", "_NOTES", "_LIGNE", "_lire_lignes", "_arborescence", "_fusion_texte", "_premier", "_pointeur", "_nettoyer_texte", "ATTRIBUTS_INDI", "TAGS_EVT_INDI", "TAGS_EVT_FAM"]
+__all__ = ["_GEDCOM_LOCK", "_serialise", "_NOTES", "_LIGNE", "_lire_lignes", "_arborescence", "_fusion_texte", "_premier", "_pointeur", "_nettoyer_texte", "ATTRIBUTS_INDI", "TAGS_EVT_INDI", "TAGS_EVT_FAM", "PEDI_VERS_FR", "PEDI_DEPUIS_FR"]
 
 _GEDCOM_LOCK = threading.RLock()
 
@@ -122,3 +122,16 @@ TAGS_EVT_INDI = {"BAPM", "CHR", "CHRA", "CONF", "FCOM", "COMU", "ORDN",
 
 TAGS_EVT_FAM = {"ENGA", "MARB", "MARC", "MARL", "MARS", "DIV", "DIVF",
                 "ANUL", "SEPR", "CENS", "EVEN"}
+
+# Type de filiation enfant→famille (FAMC.PEDI, norme 5.5.1 p. 31-32).
+# Stockage Arboriane en FRANÇAIS, côté famille : fam["pedi"] = {enfant_id: type}.
+# L'ABSENCE d'entrée = filiation de naissance (le défaut GEDCOM).
+#   - « adoption » ⇄ PEDI adopted
+#   - « accueil »  ⇄ PEDI foster       (famille d'accueil / tutelle)
+#   - « probable » ⇄ PEDI birth + STAT challenged (lien supposé, ni prouvé ni
+#     réfuté — CHILD_LINKAGE_STATUS « challenged » de la norme)
+# « sealing » (rite mormon) n'a pas d'équivalent Arboriane : lu comme naissance.
+
+PEDI_VERS_FR = {"adopted": "adoption", "foster": "accueil"}
+
+PEDI_DEPUIS_FR = {"adoption": "adopted", "accueil": "foster", "probable": "birth"}

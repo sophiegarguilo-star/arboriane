@@ -1,6 +1,6 @@
 // Fiche d'une source : métadonnées, scans (visionneuse), transcription,
 // personnes citées.
-import { h, vider } from "../../noyau/dom.js";
+import { h, vider, actionnable } from "../../noyau/dom.js";
 import { aller } from "../../noyau/etat.js";
 import { boutonRetour } from "../../composants/boutonRetour.js";
 import { apiGet, apiJson } from "../../noyau/api.js";
@@ -83,9 +83,9 @@ export async function detail(sid) {
     if (s.fichiers_resolus.length > 1) {
       const minis = h("div", { class: "rangee serre", style: "margin-top:8px" });
       urls.forEach((u) => minis.append(estPdf(u)
-        ? h("div", { title: "PDF", onclick: () => montrer(u),
+        ? actionnable(h("div", { title: "PDF", onclick: () => montrer(u),
             style: "width:64px;height:64px;border-radius:6px;cursor:pointer;border:1px solid var(--bord);"
-              + "display:flex;align-items:center;justify-content:center;font-size:11px;background:var(--accent-pale)" }, "📄 PDF")
+              + "display:flex;align-items:center;justify-content:center;font-size:11px;background:var(--accent-pale)" }, "📄 PDF"))
         : h("img", { src: u,
             style: "width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--bord)",
             onclick: () => montrer(u) })));
@@ -127,7 +127,7 @@ export async function detail(sid) {
       const fics = (s.fichiers || []).concat([r.fichier]);
       await apiJson("/api/sources/" + sid, "PUT", { fichiers: fics });
       toast("Image ajoutée."); detail(sid);
-    } catch (e) { toast(e.message); }
+    } catch (e) { toast(e.message, { type: "erreur" }); }
   }
   const drop = h("div", { class: "zone-depot" },
     "🖼 Glissez vos scans ici, ou ",
@@ -158,7 +158,7 @@ export async function detail(sid) {
     try {
       await apiJson("/api/sources/" + sid, "PUT", { transcription: trans.value });
       s.transcription = trans.value; toast("Transcription enregistrée."); marqueEnr();
-    } catch (e) { toast(e.message); } finally { btnTrans.disabled = false; }
+    } catch (e) { toast(e.message, { type: "erreur" }); } finally { btnTrans.disabled = false; }
   } }, "Enregistrer la transcription");
   viz.append(h("label", { style: "margin-top:12px" }, "Transcription"), trans,
     h("div", { class: "barre-actions", style: "align-items:center;gap:10px;margin-top:6px" },
@@ -169,9 +169,9 @@ export async function detail(sid) {
   const pers = h("div", { class: "carte" }, h("h2", {}, "Personnes citées"));
   const puces = h("div", { class: "rangee serre" });
   if (s.personnes_resolues.length) {
-    s.personnes_resolues.forEach((p) => puces.append(h("span", {
+    s.personnes_resolues.forEach((p) => puces.append(actionnable(h("span", {
       class: "puce-pers", onclick: () => aller("personnes", { fiche: p.id }) },
-      p.nom + (p.role ? " · " + p.role : ""))));
+      p.nom + (p.role ? " · " + p.role : "")))));
   } else {
     puces.append(h("p", { class: "sous-titre", style: "margin:0" }, "Aucune personne reliée pour l'instant."));
   }
@@ -191,7 +191,7 @@ export async function detail(sid) {
         await apiJson("/api/sources/" + sid + "/personne", "POST",
           { id: pid, role: inpRole.value.trim() });
         toast("Personne reliée à la source."); detail(sid);
-      } catch (e) { toast(e.message); }
+      } catch (e) { toast(e.message, { type: "erreur" }); }
     } }, "➕ Relier")));
 
   // 2) CRÉER une personne (témoin, officier… non rattachée à l'arbre) ET la citer,
@@ -215,7 +215,7 @@ export async function detail(sid) {
         await apiJson("/api/sources/" + sid + "/personne", "POST",
           { id: r.id, role: nRole.value.trim() });
         toast("Personne créée et citée."); detail(sid);
-      } catch (e) { toast(e.message); }
+      } catch (e) { toast(e.message, { type: "erreur" }); }
     } }, "＋ Créer et citer")));
   vue.append(pers);
 }

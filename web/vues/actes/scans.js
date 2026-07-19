@@ -78,7 +78,7 @@ export function blocScans(initiaux = [], { onChange } = {}) {
       const r = await apiJson("/api/media/Sources/url", "POST", { url: url.trim() });
       fichiers.push(r.fichier); ajoutes.push(r.fichier);
       rendre(); prevenir(); toast("Image ajoutée.");
-    } catch (e) { toast(e.message); }
+    } catch (e) { toast(e.message, { type: "erreur" }); }
   }
 
   const drop = h("div", { class: "zone-depot" },

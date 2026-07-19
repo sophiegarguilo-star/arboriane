@@ -124,7 +124,7 @@ def _eventail(donnees, ident, generations, angle, theme, o):
 
         if gen == 0:
             parts.append('<g class="indi" data-id="%s" data-sosa="%d" data-root="1"><title>%s</title>'
-                         % (pid, numero, _echap(modele.nom_complet(ind))))
+                         % (pid, numero, _titre_carte(ind)))
             trait_c = _couleur_preuve(donnees, pid) if avec_preuves else trait
             parts.append('<circle cx="%g" cy="%g" r="%g" fill="%s" stroke="%s" '
                          'stroke-width="%g"/>'
@@ -165,8 +165,8 @@ def _eventail(donnees, ident, generations, angle, theme, o):
         d = ("M %g %g A %g %g 0 %d 1 %g %g L %g %g A %g %g 0 %d 0 %g %g Z"
              % (x0o, y0o, r_out, r_out, grand, x1o, y1o,
                 x1i, y1i, r_in, r_in, grand, x0i, y0i))
-        parts.append('<g class="indi" data-id="%s" data-sosa="%d"><title>%s — %s</title>'
-                     % (pid, numero, _echap(modele.nom_complet(ind)), _echap(periode or "?")))
+        parts.append('<g class="indi" data-id="%s" data-sosa="%d"><title>%s</title>'
+                     % (pid, numero, _titre_carte(ind)))
         parts.append('<path d="%s" fill="%s" stroke="#fff" stroke-width="1.6"/>'
                      % (d, fond))
 

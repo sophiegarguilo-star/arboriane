@@ -112,11 +112,9 @@ def _ascendance_bh(donnees, sosa, generations, o, k, police, tfs, repeats=None):
         implexe_ici = numero in repeats
         attr_root = ' data-root="1"' if numero == 1 else ""
         sw = 3 if numero == 1 else 1.2
-        titre = modele.nom_complet(ind)
-        if implexe_ici:
-            titre += " — implexe, voir Sosa %d" % repeats[numero]
+        suffixe = " — implexe, voir Sosa %d" % repeats[numero] if implexe_ici else ""
         parts.append('<g class="indi" data-id="%s" data-sosa="%d"%s><title>%s</title>'
-                     % (sosa[numero], numero, attr_root, _echap(titre)))
+                     % (sosa[numero], numero, attr_root, _titre_carte(ind, suffixe)))
         trait_c = _couleur_preuve(donnees, sosa[numero]) if avec_preuves else trait
         if implexe_ici:                       # ancêtre répété : grisé + renvoi
             fond_c, trait_c = IMPLEXE_FOND, IMPLEXE_TRAIT
@@ -282,9 +280,9 @@ def _ascendance(donnees, ident, generations, o):
         trait_c = _couleur_preuve(donnees, sosa[numero]) if avec_preuves else trait
         if implexe_ici:                            # ancêtre répété : grisé + renvoi
             fond_c, trait_c = IMPLEXE_FOND, IMPLEXE_TRAIT
-        titre = nom + (" — implexe, voir Sosa %d" % repeats[numero] if implexe_ici else "")
+        suffixe = " — implexe, voir Sosa %d" % repeats[numero] if implexe_ici else ""
         parts.append('<g class="indi" data-id="%s" data-sosa="%d"%s><title>%s</title>' %
-                     (sosa[numero], numero, attr_root, _echap(titre)))
+                     (sosa[numero], numero, attr_root, _titre_carte(ind, suffixe)))
         parts.append('<rect x="%g" y="%g" width="%g" height="%g" rx="8" fill="%s" '
                      'stroke="%s" stroke-width="%g"/>'
                      % (x, y, largeur_carte, hauteur_carte, fond_c, trait_c,

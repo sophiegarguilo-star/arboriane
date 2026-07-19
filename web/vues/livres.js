@@ -47,7 +47,7 @@ async function nouveauLivre() {
       const r = await apiJson("/api/livres", "POST", { referent: id, type: typeChoisi });
       toast("Livre créé.");
       aller("livres", { livre: r.livre.id });
-    } catch (e) { toast(e.message); }
+    } catch (e) { toast(e.message, { type: "erreur" }); }
   }
   const picker = champPersonne(liste, {
     placeholder: typeChoisi === "ascendance"
@@ -88,7 +88,7 @@ function carteLivre(l) {
           + "(Votre arbre et vos personnes ne sont pas touchés.)",
           { titre: "Supprimer le livre", valider: "Supprimer", danger: true })) return;
         try { await apiJson("/api/livres/" + l.id, "DELETE", {}); toast("Livre supprimé."); aller("livres"); }
-        catch (e) { toast(e.message); }
+        catch (e) { toast(e.message, { type: "erreur" }); }
       } }, "Supprimer")));
 }
 
@@ -115,18 +115,18 @@ async function vueListe(vue) {
 async function vueEditeur(vue, lid) {
   let livre;
   try { livre = (await apiGet("/api/livres/" + lid)).livre; }
-  catch (e) { toast(e.message); return aller("livres"); }
+  catch (e) { toast(e.message, { type: "erreur" }); return aller("livres"); }
   const mep = livre.mise_en_page || (livre.mise_en_page = {});
 
   let tSauve = null;
   function sauver() {                       // enregistrement différé (regroupe les clics)
     clearTimeout(tSauve);
     tSauve = setTimeout(() => apiJson("/api/livres/" + lid, "PUT", livre)
-      .catch((e) => toast(e.message)), 350);
+      .catch((e) => toast(e.message, { type: "erreur" })), 350);
   }
   async function vider_diff() {             // force l'envoi en attente et l'attend
     if (tSauve) { clearTimeout(tSauve); tSauve = null; }
-    try { await apiJson("/api/livres/" + lid, "PUT", livre); } catch (e) { toast(e.message); }
+    try { await apiJson("/api/livres/" + lid, "PUT", livre); } catch (e) { toast(e.message, { type: "erreur" }); }
   }
 
   async function ouvrirRendu(imprimer) {
@@ -146,7 +146,7 @@ async function vueEditeur(vue, lid) {
       w.document.open(); w.document.write(html); w.document.close();
       if (imprimer) { w.focus(); setTimeout(() => { try { w.print(); } catch (e) { /* */ } }, 500); }
     } catch (e) {
-      toast(e.message);
+      toast(e.message, { type: "erreur" });
       try { w.close(); } catch (_) { /* */ }
     }
   }

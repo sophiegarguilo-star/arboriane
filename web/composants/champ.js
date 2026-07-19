@@ -2,6 +2,7 @@
 // navigable au clavier (↑/↓/Entrée/Échap) et accessible (ARIA combobox).
 // Renvoie { element, valeur(), definir(id), vider() }.
 import { h, vider } from "../noyau/dom.js";
+import { normaliser } from "../noyau/texte.js";
 
 let _seq = 0;
 
@@ -38,8 +39,8 @@ export function champPersonne(liste, { placeholder = "Rechercher une personne…
   }
   function ouvrir(filtre) {
     vider(menu); options = [];
-    const q = (filtre || "").trim().toLowerCase();
-    const res = tri.filter((p) => !q || p.nom.toLowerCase().includes(q)).slice(0, 40);
+    const q = normaliser((filtre || "").trim());
+    const res = tri.filter((p) => !q || normaliser(p.nom).includes(q)).slice(0, 40);
     if (!res.length) { fermer(); return; }
     res.forEach((p) => {
       const o = h("div", { class: "champ-option", role: "option",

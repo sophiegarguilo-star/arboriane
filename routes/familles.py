@@ -94,3 +94,41 @@ def modifier_famille(app, params, corps, fid):
     if not fam:
         return (404, {"erreur": "Famille introuvable."})
     return {"ok": True}
+
+
+# Types de filiation enfant→famille (MET-01). Stockés en FRANÇAIS côté famille
+# (fam["pedi"] = {enfant_id: type}) ; l'ABSENCE d'entrée = naissance, le défaut.
+# Exportés en FAMC.PEDI (adopted/foster/birth+STAT challenged), relus à l'import.
+TYPES_FILIATION = ("adoption", "accueil", "probable")
+
+
+@route("POST", r"^/api/familles/(?P<fid>[A-Za-z0-9]+)/filiation$")
+def definir_filiation(app, params, corps, fid):
+    """Pose ou retire le TYPE de filiation d'un enfant dans cette union.
+    Corps : { enfant: "I3", type: "adoption" | "accueil" | "probable" | "" }.
+    Un type vide (ou « naissance ») retire l'entrée — retour au défaut."""
+    base = _base(app)
+    fam = base.donnees["familles"].get(fid)
+    if not fam:
+        return (404, {"erreur": "Famille introuvable."})
+    enfant = (corps.get("enfant") or "").strip()
+    if enfant not in (fam.get("enfants") or []):
+        raise ErreurValidation("Cet enfant n'appartient pas à cette union.")
+    typ = (corps.get("type") or "").strip().lower()
+    if typ == "naissance":
+        typ = ""
+    if typ and typ not in TYPES_FILIATION:
+        raise ErreurValidation(
+            "Type de filiation inconnu (adoption, accueil ou probable).")
+    with base._verrou:                # même verrou que les méthodes de la Base
+        pedi = dict(fam.get("pedi") or {})
+        if typ:
+            pedi[enfant] = typ
+        else:
+            pedi.pop(enfant, None)
+        if pedi:
+            fam["pedi"] = pedi
+        else:
+            fam.pop("pedi", None)     # pas de dict vide qui traîne dans le JSON
+        base.sauvegarder()
+    return {"ok": True, "type": typ}

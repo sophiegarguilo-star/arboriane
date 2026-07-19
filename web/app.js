@@ -5,7 +5,9 @@ import { VUES, etat, aller, retour, peutRevenir, surNavigation, majEspace, resta
 import { apiGet } from "./noyau/api.js";
 import { initGardeVersion } from "./noyau/version.js";
 import { initVieServeur } from "./noyau/vie.js";
+import { normaliser } from "./noyau/texte.js";
 import { initMaj } from "./composants/maj.js";
+import { menuSimplifie } from "./noyau/prefs.js";
 import { initModale, fermerModale, modaleOuverte } from "./composants/modale.js";
 import { initVolet, fermerVolet, voletOuvert } from "./composants/volet.js";
 import { fermerVisionneuse, visionneuseOuverte } from "./composants/visionneuse.js";
@@ -39,42 +41,44 @@ import { vueAide } from "./vues/aide.js";
 
 // ── Structure de la navigation (groupes du cahier des charges) ──────────
 const NAV = [
+  // [vue, icône, libellé, info-bulle, avancé?] — les onglets « avancés » sont
+  // masqués quand « menu simplifié » est actif (Réglages › Affichage, UX-01).
   ["Explorer", [
-    ["accueil", "🏠", "Tableau de bord"],
-    ["personnes", "👥", "Personnes"],
-    ["favoris", "⭐", "Favoris & ensembles"],
-    ["arbre", "🌳", "Arbre"],
-    ["sosa", "🧭", "Sosa"],
-    ["parente", "🔗", "Parenté"],
-    ["lieux", "🗺️", "Lieux / Carte"],
-    ["lieux-ref", "🏘️", "Référentiel des lieux"],
+    ["accueil", "🏠", "Tableau de bord", "Vue d'ensemble de votre arbre"],
+    ["personnes", "👥", "Personnes", "Toutes les personnes de l'arbre"],
+    ["favoris", "⭐", "Favoris & ensembles", "Vos personnes marquées et vos groupes"],
+    ["arbre", "🌳", "Arbre", "L'arbre graphique (éventail, ascendance…)"],
+    ["sosa", "🧭", "Sosa", "Ascendance numérotée : 1 = la personne, 2 = son père…"],
+    ["parente", "🔗", "Parenté", "Quel lien entre deux personnes ?"],
+    ["lieux", "🗺️", "Lieux / Carte", "Tous les lieux cités, sur carte"],
+    ["lieux-ref", "🏘️", "Référentiel des lieux", "Nettoyer et organiser les noms de lieux", true],
   ]],
   ["Rechercher", [
-    ["recherche", "🎯", "Plan de recherche"],
-    ["actes", "📄", "Actes / Sources"],
-    ["depots", "🏛️", "Dépôts"],
-    ["carnet", "📔", "Carnet de bord"],
+    ["recherche", "🎯", "Plan de recherche", "Ce qu'il reste à prouver, acte par acte"],
+    ["actes", "📄", "Actes / Sources", "Vos preuves : actes, registres, scans"],
+    ["depots", "🏛️", "Dépôts", "Archives et sites où chercher"],
+    ["carnet", "📔", "Carnet de bord", "Votre journal de recherche"],
   ]],
   ["Analyser", [
-    ["stats", "📊", "Statistiques"],
-    ["coherence", "⚠️", "Cohérence"],
-    ["sante", "🩺", "Santé de l'arbre"],
-    ["verif", "🔍", "Qualité des sources"],
-    ["implexe", "🧬", "Implexe"],
-    ["listes", "📋", "Listes & index"],
-    ["fusion", "🔀", "Fusion assistée"],
-    ["contemporains", "🕰", "Chronologie"],
+    ["stats", "📊", "Statistiques", "Chiffres et graphiques de l'arbre"],
+    ["coherence", "⚠️", "Cohérence", "Dates et liens suspects détectés"],
+    ["sante", "🩺", "Santé de l'arbre", "Points faibles : sources manquantes, scans absents…"],
+    ["verif", "🔍", "Qualité des sources", "Contrôle qualité de vos preuves", true],
+    ["implexe", "🧬", "Implexe", "Ancêtres communs et consanguinité", true],
+    ["listes", "📋", "Listes & index", "Index : métiers, unions, anniversaires…"],
+    ["fusion", "🔀", "Fusion assistée", "Trouver et fusionner les doublons", true],
+    ["contemporains", "🕰", "Chronologie", "Qui vivait en même temps ?", true],
   ]],
   ["Composer", [
-    ["livres", "📖", "Livres"],
+    ["livres", "📖", "Livres", "Composer un livre de famille"],
   ]],
   ["Outils", [
-    ["espace", "🗂️", "Espace de travail"],
-    ["explorateur", "📂", "Explorateur"],
-    ["donnees", "⇅", "Sauvegarde et export"],
-    ["assistant", "🤖", "Assistant"],
-    ["reglages", "⚙️", "Réglages"],
-    ["apropos", "❓", "Aide & tutoriels"],
+    ["espace", "🗂️", "Espace de travail", "Vos arbres : ouvrir, sauvegarder, dupliquer"],
+    ["explorateur", "📂", "Explorateur", "Les fichiers rangés dans l'arbre"],
+    ["donnees", "⇅", "Sauvegarde et export", "Importer / exporter (GEDCOM), sauvegardes"],
+    ["assistant", "🤖", "Assistant", "Aide à la rédaction (facultatif)"],
+    ["reglages", "⚙️", "Réglages", "Préférences de l'application"],
+    ["apropos", "❓", "Aide & tutoriels", "Mode d'emploi et réponses aux questions"],
   ]],
 ];
 
@@ -112,16 +116,21 @@ VUES.apropos = vueAide;
 function construireMenu() {
   const liste = document.getElementById("menu-liste");
   vider(liste);
+  const simplifie = menuSimplifie();
   for (const [groupe, entrees] of NAV) {
+    const visibles = entrees.filter(([, , , , avance]) => !(simplifie && avance));
+    if (!visibles.length) continue;
     liste.append(h("div", { class: "menu-groupe" }, groupe));
-    for (const [nom, emoji, libelle] of entrees) {
+    for (const [nom, emoji, libelle, bulle] of visibles) {
       liste.append(h("button", {
         class: "onglet" + (etat.vue === nom ? " actif" : ""),
-        "data-vue": nom, onclick: () => aller(nom),
+        "data-vue": nom, title: bulle || libelle, onclick: () => aller(nom),
       }, h("span", { class: "oic" }, emoji), libelle));
     }
   }
 }
+// Réglages › Affichage bascule le mode : on reconstruit le menu aussitôt.
+window.addEventListener("arbo-menu-change", construireMenu);
 
 surNavigation((nom) => {
   document.querySelectorAll(".onglet").forEach((b) =>
@@ -173,12 +182,12 @@ function initRechercheGlobale() {
   }
 
   async function chercher() {
-    const q = input.value.trim().toLowerCase();
+    const q = normaliser(input.value.trim());
     if (q.length < 2) { menu.classList.remove("on"); return; }
     if (!cache) cache = await charger();
-    const pers = cache.ind.filter((p) => (p.nom || "").toLowerCase().includes(q)).slice(0, 8);
-    const lieux = cache.lieux.filter((l) => (l.nom || "").toLowerCase().includes(q)).slice(0, 5);
-    const srcs = cache.srcs.filter((s) => (s.titre || "").toLowerCase().includes(q)).slice(0, 5);
+    const pers = cache.ind.filter((p) => normaliser(p.nom).includes(q)).slice(0, 8);
+    const lieux = cache.lieux.filter((l) => normaliser(l.nom).includes(q)).slice(0, 5);
+    const srcs = cache.srcs.filter((s) => normaliser(s.titre).includes(q)).slice(0, 5);
     vider(menu);
     if (!pers.length && !lieux.length && !srcs.length) { menu.classList.remove("on"); return; }
     if (pers.length) {

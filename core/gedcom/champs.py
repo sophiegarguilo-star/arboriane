@@ -203,6 +203,13 @@ def _evenement(noeud):
         cause = _fusion_texte(caus).strip()
         if cause:
             ev["cause"] = cause
+    # note de l'événement (2 NOTE sous BIRT/DEAT/MARR/RESI) : elle était perdue
+    # à l'import alors que _evenement_generique la lisait déjà (GED-01).
+    n = _premier(noeud, "NOTE")
+    if n:
+        txt = _lire_note(n)
+        if txt:
+            ev["note"] = txt
     cites = _citations(noeud)
     if cites:
         ev["citations"] = cites

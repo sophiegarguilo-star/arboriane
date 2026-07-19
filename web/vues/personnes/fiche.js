@@ -1,6 +1,6 @@
 // Personnes — fiche d'une personne : en-tête, onglets (synthèse, chronologie,
 // famille, sources, recherche web, photos, GEDCOM), ajout rapide de proches.
-import { h, vider } from "../../noyau/dom.js";
+import { h, vider, actionnable } from "../../noyau/dom.js";
 import { aller, retour, peutRevenir } from "../../noyau/etat.js";
 import { apiGet, apiJson } from "../../noyau/api.js";
 import { badge, pastilleSexe } from "../../composants/badge.js";
@@ -20,6 +20,16 @@ import { sectionChronologie, sectionPistes, sectionDocuments, sectionPreuves,
 function ajoutRelatif(pid, type, nom, fid) {
   aller("personnes", { creer: true,
     lien: { type, ancre: pid, ancreNom: nom, famille: fid || null } });
+}
+
+// Types de filiation (MET-01) : fam.pedi = {enfant_id: type} côté serveur —
+// l'absence d'entrée = naissance (le défaut, jamais affiché).
+const FILIATION_LABEL = { adoption: "adopté·e", accueil: "accueilli·e",
+                          probable: "lien à confirmer" };
+
+function badgeFiliation(type) {
+  const lib = FILIATION_LABEL[type];
+  return lib ? badge(lib, "info") : null;
 }
 
 // Le divorce (et les autres faits du couple) vit dans fam.evenements, type GEDCOM « DIV ».
@@ -103,6 +113,39 @@ async function modifierUnion(pid, u, nom) {
     h("div", { class: "champ" }, h("label", {}, "Date du divorce"), dDiv.element),
     h("div", { class: "champ" }, h("label", {}, "Lieu du divorce"), lDiv.element)));
 
+  // ── Filiation des enfants (MET-01) : naissance par défaut ; adoption,
+  // accueil ou « lien à confirmer » se posent ici, enfant par enfant.
+  // Chaque changement est enregistré aussitôt (POST /filiation).
+  if ((u.enfants || []).length) {
+    const carteEnfants = h("div", { class: "carte", style: "max-width:620px" },
+      h("h2", { style: "margin-top:0" }, "👶 Enfants & filiation"),
+      h("p", { style: "color:var(--gris-clair);font-size:13px;margin:0 0 8px" },
+        "« Naissance » est le lien par défaut. Indiquez une adoption, un accueil "
+        + "ou un lien restant à confirmer : c'est affiché sur la fiche et conservé "
+        + "à l'export GEDCOM (balise PEDI)."));
+    const CHOIX_FILIATION = [["", "Naissance"], ["adoption", "Adopté·e"],
+      ["accueil", "Accueilli·e"], ["probable", "Lien à confirmer"]];
+    u.enfants.forEach((c) => {
+      const actuel = (u.pedi || {})[c.id] || "";
+      const sel = h("select", { "aria-label": "Filiation de " + c.nom },
+        ...CHOIX_FILIATION.map(([v, lib]) =>
+          h("option", { value: v, selected: actuel === v ? "selected" : null }, lib)));
+      sel.addEventListener("change", async () => {
+        try {
+          await apiJson("/api/familles/" + u.famille + "/filiation", "POST",
+            { enfant: c.id, type: sel.value });
+          u.pedi = u.pedi || {};
+          if (sel.value) u.pedi[c.id] = sel.value; else delete u.pedi[c.id];
+          toast("Filiation de " + c.nom + " enregistrée.");
+        } catch (e) { toast(e.message, { type: "erreur" }); }
+      });
+      carteEnfants.append(h("div", { class: "rangee", style: "padding:4px 0;gap:10px" },
+        h("span", { style: "flex:1;min-width:0" }, c.nom + (c.periode ? "  " + c.periode : "")),
+        sel));
+    });
+    vue.append(carteEnfants);
+  }
+
   let enCours = false;
   vue.append(h("div", { class: "barre-actions", style: "max-width:620px" },
     h("button", { class: "bouton", onclick: async () => {
@@ -124,7 +167,7 @@ async function modifierUnion(pid, u, nom) {
           { mariage: { date: dMar.valeur(), lieu: lMar.valeur() }, evenements });
         toast("Union enregistrée.");
         retour();
-      } catch (e) { toast(e.message); enCours = false; }
+      } catch (e) { toast(e.message, { type: "erreur" }); enCours = false; }
     } }, "Enregistrer"),
     h("button", { class: "bouton secondaire", onclick: retour }, "Annuler")));
 }
@@ -148,12 +191,12 @@ export async function vueFiche(vue, pid, ongletInitial) {
       [(f.periode || "dates inconnues") + (f.age != null ? " · " + f.age + " ans" : ""), prof]
         .filter(Boolean).join(" · ")),
     (f.relation_racine && f.racine_nom)
-      ? h("div", { class: "fiche-relation", onclick: () => aller("sosa") },
-          "👥 " + majuscule(f.relation_racine) + " de " + f.racine_nom)
+      ? actionnable(h("div", { class: "fiche-relation", onclick: () => aller("sosa") },
+          "👥 " + majuscule(f.relation_racine) + " de " + f.racine_nom))
       : null,
     h("div", { class: "fiche-badges" },
-      f.sosa ? h("span", { class: "badge ok", style: "cursor:pointer",
-        onclick: () => aller("sosa") }, "Sosa n° " + f.sosa + (f.sosa > 1 ? " · Ancêtre direct" : "")) : null,
+      f.sosa ? actionnable(h("span", { class: "badge ok", style: "cursor:pointer",
+        onclick: () => aller("sosa") }, "Sosa n° " + f.sosa + (f.sosa > 1 ? " · Ancêtre direct" : ""))) : null,
       branche ? badge(branche, "info") : null,
       (f.peres.length || f.meres.length)
         ? badge(f.fratrie.length ? f.fratrie.length + " frère(s)/sœur(s)" : "Enfant unique") : null,
@@ -181,7 +224,7 @@ export async function vueFiche(vue, pid, ongletInitial) {
       const r = await apiJson("/api/favoris/basculer", "POST", { id: pid });
       btnFav.textContent = r.favori ? "★ Favori" : "☆ Favori";
       toast(r.favori ? "Ajouté aux favoris." : "Retiré des favoris.");
-    } catch (e) { toast(e.message); }
+    } catch (e) { toast(e.message, { type: "erreur" }); }
   } }, estFav ? "★ Favori" : "☆ Favori");
 
   vue.append(h("div", { class: "barre-actions", style: "margin-bottom:16px" },
@@ -195,11 +238,25 @@ export async function vueFiche(vue, pid, ongletInitial) {
     h("button", { class: "bouton danger petit",
       title: "Supprimer cette personne", "aria-label": "Supprimer cette personne",
       onclick: async () => {
-        if (!await confirmer("Supprimer « " + f.nom_complet + " » ? Cette action est définitive.",
+        if (!await confirmer("Supprimer « " + f.nom_complet + " » ? Vous pourrez "
+          + "annuler juste après (bouton « Annuler » de la notification).",
           { titre: "Supprimer la personne", valider: "Supprimer", danger: true })) return;
-        await apiJson("/api/individus/" + pid, "DELETE", {});
-        toast("Personne « " + f.nom_complet + " » supprimée.");
-        aller("personnes");
+        try {
+          await apiJson("/api/individus/" + pid, "DELETE", {});
+          // Suppression RÉVERSIBLE (UX-03) : un instantané est déposé côté
+          // serveur (Corbeille/) — le toast propose « Annuler » pendant 10 s.
+          toast("Personne « " + f.nom_complet + " » supprimée.", {
+            duree: 10000, actionLabel: "Annuler",
+            action: async () => {
+              try {
+                const r = await apiJson("/api/individus/restaurer-dernier", "POST", {});
+                toast("« " + (r.nom || "Personne") + " » est de retour, avec ses liens familiaux.");
+                aller("personnes", { fiche: r.id });
+              } catch (e) { toast(e.message, { type: "erreur" }); }
+            },
+          });
+          aller("personnes");
+        } catch (e) { toast(e.message, { type: "erreur" }); }
       } }, "🗑")));
 
   // ── Onglets ────────────────────────────────────────────────────────────
@@ -333,8 +390,8 @@ function reperesDeVie(f, pid) {
       h("span", { class: "repere-ico" }, "📍"),
       h("div", {}, h("div", { class: "repere-titre" }, "Lieux de vie"),
         h("div", { class: "repere-corps" },
-          lieuxVie.map((l, i) => h("span", { class: "lien", style: "cursor:pointer",
-            onclick: () => aller("lieux", { focus: l }) }, (i ? " · " : "") + l))))) : null,
+          lieuxVie.map((l, i) => actionnable(h("span", { class: "lien", style: "cursor:pointer",
+            onclick: () => aller("lieux", { focus: l }) }, (i ? " · " : "") + l)))))) : null,
   ].filter(Boolean);   // ne jamais append(null) : le DOM le convertirait en « null »
   if (!reperes.length)
     reperes.push(h("div", { class: "vide compacte" }, "Repères à compléter."));
@@ -377,6 +434,12 @@ function celluleFamiliale(f) {
   } else {
     ligneParents.append(h("span", { style: "color:var(--gris-clair)" }, "Parents inconnus"));
   }
+  // Type de filiation avec ces parents (adoption / accueil / à confirmer) :
+  // un badge discret, seulement quand la famille le dit (fam.pedi).
+  if (parents.length && f.filiation) {
+    const b = badgeFiliation(f.filiation);
+    if (b) { b.title = "Type de filiation avec ces parents"; ligneParents.append(b); }
+  }
   // Ajout d'un parent manquant, directement là où on le cherche.
   if (!f.peres.length) ligneParents.append(h("button", { class: "bouton secondaire petit",
     onclick: () => ajoutRelatif(f.id, "pere", f.nom_complet) }, "＋ Père"));
@@ -397,8 +460,8 @@ function celluleFamiliale(f) {
 }
 
 function pucePersonne(p) {
-  return h("span", { class: "puce-pers", onclick: () => aller("personnes", { fiche: p.id }) },
-    pastilleSexe(p.sexe), p.nom + (p.periode ? "  " + p.periode : ""));
+  return actionnable(h("span", { class: "puce-pers", onclick: () => aller("personnes", { fiche: p.id }) },
+    pastilleSexe(p.sexe), p.nom + (p.periode ? "  " + p.periode : "")));
 }
 
 function blocUnion(f, pid, u) {
@@ -423,8 +486,13 @@ function blocUnion(f, pid, u) {
     + ((div.date || div.lieu) ? " · " + [div.date, div.lieu].filter(Boolean).join(" à ") : "")));
   if (u.enfants.length) {
     bloc.append(h("div", { class: "sur-titre" }, "Enfants"));
-    const e = h("div", { style: "display:flex;flex-wrap:wrap;gap:6px;margin-top:2px" });
-    u.enfants.forEach((c) => e.append(pucePersonne(c)));
+    const e = h("div", { style: "display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;align-items:center" });
+    u.enfants.forEach((c) => {
+      e.append(pucePersonne(c));
+      // badge discret quand la filiation n'est pas une naissance (fam.pedi)
+      const b = badgeFiliation((u.pedi || {})[c.id]);
+      if (b) e.append(b);
+    });
     bloc.append(e);
   }
   bloc.append(h("div", { class: "barre-actions", style: "margin-top:6px" },

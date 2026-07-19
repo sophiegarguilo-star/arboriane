@@ -6,6 +6,7 @@
 // La saisie reste LIBRE. Renvoie { element, valeur() }.
 import { h, vider } from "../noyau/dom.js";
 import { apiGet, apiJson } from "../noyau/api.js";
+import { normaliser } from "../noyau/texte.js";
 
 let _cacheLieux = null;
 
@@ -81,9 +82,9 @@ export function champLieu(connus, { valeur = "", placeholder = "Ville, départem
   }
 
   function ouvrir() {
-    const q = input.value.trim().toLowerCase();
+    const q = normaliser(input.value.trim());
     if (q.length < 2) { fermer(); return; }
-    const locaux = liste.filter((l) => l.toLowerCase().includes(q)).slice(0, 6);
+    const locaux = liste.filter((l) => normaliser(l).includes(q)).slice(0, 6);
     rendre(locaux, []);
     clearTimeout(tGeo);
     tGeo = setTimeout(() => interrogerEnLigne(locaux, input.value.trim()), 350);

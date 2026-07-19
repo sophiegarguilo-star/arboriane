@@ -3,6 +3,7 @@ import { h, vider } from "../noyau/dom.js";
 import { apiGet, apiJson } from "../noyau/api.js";
 import { badge } from "../composants/badge.js";
 import { toast } from "../composants/toast.js";
+import { menuSimplifie, definirMenuSimplifie } from "../noyau/prefs.js";
 
 const FOURNISSEURS = [["anthropic", "Anthropic (Claude)"], ["openai", "OpenAI (GPT)"],
                       ["gemini", "Google (Gemini)"]];
@@ -26,7 +27,7 @@ export async function vueReglages(vue) {
           try {
             await apiJson("/api/reglages", "PUT", { effacer_cle: true });
             toast("Clé effacée."); r.cle_definie = false; etatCle();
-          } catch (e) { toast(e.message); }
+          } catch (e) { toast(e.message, { type: "erreur" }); }
         } }, "effacer la clé")));
     } else {
       zoneCle.append(h("p", { class: "sous-titre" }, "Aucune clé enregistrée — l'assistant est inactif."));
@@ -57,7 +58,7 @@ export async function vueReglages(vue) {
           const res = await apiJson("/api/reglages", "PUT", corps);
           Object.assign(r, res); inpCle.value = "";
           toast("Réglages enregistrés."); etatCle();
-        } catch (e) { toast(e.message); }
+        } catch (e) { toast(e.message, { type: "erreur" }); }
       } }, "Enregistrer")));
   etatCle();
   vue.append(carteIA);
@@ -68,7 +69,7 @@ export async function vueReglages(vue) {
     try {
       await apiJson("/api/reglages", "PUT", { geocodage_ok: chk.checked });
       toast(chk.checked ? "Géocodage activé." : "Géocodage désactivé.");
-    } catch (e) { chk.checked = !chk.checked; toast(e.message); }
+    } catch (e) { chk.checked = !chk.checked; toast(e.message, { type: "erreur" }); }
   });
   // Pays par défaut : ajouté à la recherche d'un lieu sans pays (ex. « Neufchâteau »
   // → « Neufchâteau, Belgique »), pour éviter les confusions au géocodage.
@@ -77,7 +78,7 @@ export async function vueReglages(vue) {
   let paysTimer = null;
   const sauverPays = () => { clearTimeout(paysTimer); paysTimer = setTimeout(async () => {
     try { await apiJson("/api/reglages", "PUT", { pays_defaut: champPays.value.trim() });
-      toast("Pays par défaut enregistré."); } catch (e) { toast(e.message); }
+      toast("Pays par défaut enregistré."); } catch (e) { toast(e.message, { type: "erreur" }); }
   }, 600); };
   champPays.addEventListener("input", sauverPays);
   vue.append(h("div", { class: "carte" },
@@ -105,8 +106,27 @@ export async function vueReglages(vue) {
   selNav.addEventListener("change", async () => {
     try { await apiJson("/api/reglages", "PUT", { navigateur: selNav.value });
       toast("Navigateur enregistré (effet au prochain lancement)."); }
-    catch (e) { toast(e.message); }
+    catch (e) { toast(e.message, { type: "erreur" }); }
   });
+  // Affichage : menu simplifié (UX-01) — masque les onglets d'analyse avancée
+  // pour ne pas noyer les débutants ; réactivables ici d'un clic.
+  const chkMenu = h("input", { type: "checkbox", checked: menuSimplifie() ? "checked" : null });
+  chkMenu.addEventListener("change", () => {
+    definirMenuSimplifie(chkMenu.checked);
+    toast(chkMenu.checked
+      ? "Menu simplifié : les outils d'analyse avancée sont masqués (réactivables ici)."
+      : "Menu complet : tous les onglets sont affichés.");
+  });
+  vue.append(h("div", { class: "carte" },
+    h("h2", {}, "🧭 Affichage"),
+    h("p", { class: "sous-titre" },
+      "Le menu simplifié masque les outils d'analyse avancée (Implexe, Fusion "
+      + "assistée, Référentiel des lieux, Qualité des sources, Chronologie) pour "
+      + "aller à l'essentiel. Vos données ne changent pas : seuls les onglets "
+      + "sont masqués, et tout revient en décochant."),
+    h("label", { style: "display:flex;align-items:center;gap:8px;cursor:pointer" },
+      chkMenu, "Menu simplifié (masquer les outils avancés)")));
+
   vue.append(h("div", { class: "carte" },
     h("h2", {}, "🌐 Navigateur d'ouverture"),
     h("p", { class: "sous-titre" },
@@ -123,7 +143,7 @@ export async function vueReglages(vue) {
       await apiJson("/api/maj/preference", "POST", { actif: chkMaj.checked });
       toast(chkMaj.checked ? "Vérification des mises à jour activée."
                            : "Vérification des mises à jour désactivée.");
-    } catch (e) { chkMaj.checked = !chkMaj.checked; toast(e.message); }
+    } catch (e) { chkMaj.checked = !chkMaj.checked; toast(e.message, { type: "erreur" }); }
   });
   vue.append(h("div", { class: "carte" },
     h("h2", {}, "🔔 Mises à jour"),

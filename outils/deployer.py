@@ -96,7 +96,48 @@ def build():
         raise SystemExit("Build échoué (code %d)." % r.returncode)
     if not os.path.isfile(os.path.join(DIST, "Arboriane.exe")):
         raise SystemExit("Build : Arboriane.exe introuvable.")
+    ecrire_build_info()
     log("build OK")
+
+
+def _version_pyinstaller():
+    try:
+        import PyInstaller
+        return getattr(PyInstaller, "__version__", "inconnue")
+    except Exception:
+        return "inconnue"
+
+
+def _version_iscc():
+    """Version d'ISCC.exe lue dans les métadonnées du fichier (PowerShell)."""
+    if not os.path.isfile(ISCC):
+        return "absente"
+    ps = "(Get-Item '%s').VersionInfo.ProductVersion" % ISCC.replace("'", "''")
+    r = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+                       capture_output=True, text=True, creationflags=_NO_WINDOW)
+    return (r.stdout or "").strip() or "inconnue"
+
+
+def ecrire_build_info(dossier=None):
+    """Écrit dist/build-info.txt : avec QUOI ce binaire a été construit.
+
+    Reproductibilité (voir BUILD.md) : des mois plus tard, on doit pouvoir
+    reconstruire le même binaire — donc savoir quelles versions de Python,
+    PyInstaller et Inno Setup ont servi. Écrit à CHAQUE build."""
+    dossier = dossier or os.path.join(RACINE, "dist")
+    os.makedirs(dossier, exist_ok=True)
+    chemin = os.path.join(dossier, "build-info.txt")
+    lignes = [
+        "Arboriane   : %s" % VERSION,
+        "date        : %s" % time.strftime("%Y-%m-%d %H:%M:%S"),
+        "python      : %s" % sys.version.split()[0],
+        "pyinstaller : %s" % _version_pyinstaller(),
+        "inno setup  : %s" % _version_iscc(),
+    ]
+    with open(chemin, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(lignes) + "\n")
+    log("build-info.txt écrit -> %s" % chemin)
+    return chemin
 
 
 # ── 4+5. Déploiement ─────────────────────────────────────────────────────
@@ -243,6 +284,47 @@ def construire_installateur():
         (INSTALLEUR, os.path.getsize(INSTALLEUR) / (1024 * 1024)))
 
 
+def _git(args):
+    """git dans la RACINE, sortie capturée. Ne lève pas : à l'appelant de
+    contrôler returncode (les échecs git doivent ARRÊTER une publication)."""
+    return subprocess.run(["git", *args], cwd=RACINE, capture_output=True,
+                          text=True, encoding="utf-8", errors="replace")
+
+
+def _arbre_git_propre():
+    """True si `git status --porcelain` ne liste RIEN (arbre propre)."""
+    r = _git(["status", "--porcelain"])
+    if r.returncode != 0:
+        raise SystemExit("ARRÊT : git status a échoué (%s)."
+                         % (r.stderr or "").strip()[:200])
+    return not (r.stdout or "").strip()
+
+
+# Posé par exiger_arbre_propre() AVANT le build ; publier() refuse sans lui.
+_ARBRE_VERIFIE_PROPRE = False
+
+
+def exiger_arbre_propre():
+    """ARRÊT si l'arbre git est sale. Appelé AVANT le build (barrière release) :
+    ainsi le commit unique « Arboriane X.Y.Z » de publier() (git add -A) ne peut
+    contenir QUE ce que le déployeur produit lui-même (version_info, installeur
+    .iss, CHANGELOG, page), jamais un travail en cours embarqué par accident."""
+    global _ARBRE_VERIFIE_PROPRE
+    if not _arbre_git_propre():
+        raise SystemExit(
+            "ARRÊT : l'arbre git n'est pas propre (voir git status).\n"
+            "Committez ou remisez votre travail en cours avant de publier.")
+    _ARBRE_VERIFIE_PROPRE = True
+    log("barrière : arbre git propre")
+
+
+def _release_distante_existe(tag):
+    """True si la release existe déjà CÔTÉ DISTANT (GitHub), pas seulement en
+    tag local — c'est la seule vérité qui compte pour « déjà publié »."""
+    return subprocess.run([GH, "release", "view", tag, "--repo", DEPOT],
+                          capture_output=True).returncode == 0
+
+
 def _dernier_commit_ts():
     r = subprocess.run(["git", "log", "-1", "--format=%ct"], cwd=RACINE,
                        capture_output=True, text=True)
@@ -288,41 +370,12 @@ def _notes(somme):
         "Le code source correspondant est celui du tag `v%s`.\n" % (somme, VERSION))
 
 
-def publier():
-    """Crée/complète le release vX.Y.Z, y attache l'installeur et son empreinte
-    SHA-256. Refuse si l'installeur est plus ANCIEN que le dernier commit
-    (asset périmé = la panne du 2026-07-09)."""
-    tag = "v" + VERSION
-    asset_ts = int(os.path.getmtime(INSTALLEUR))
-    if asset_ts < _dernier_commit_ts():
-        raise SystemExit("Installeur plus ancien que le dernier commit : "
-                         "recompile-le AVANT de publier (asset périmé).")
-    fichier_somme, somme = _ecrire_empreinte()
-    existe = subprocess.run([GH, "release", "view", tag, "--repo", DEPOT],
-                            capture_output=True).returncode == 0
-    if existe:
-        log("upload de l'installeur sur le release %s…" % tag)
-        cmd = [GH, "release", "upload", tag, INSTALLEUR, fichier_somme,
-               "--repo", DEPOT, "--clobber"]
-    else:
-        log("création du release %s + installeur + empreinte…" % tag)
-        cmd = [GH, "release", "create", tag, INSTALLEUR, fichier_somme,
-               "--repo", DEPOT, "--title", "Arboriane " + VERSION,
-               "--notes", _notes(somme)]
-    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
-                       errors="replace")
-    if r.returncode != 0:
-        raise SystemExit("Publication GitHub échouée :\n" + (r.stderr or ""))
-    log("publié : https://github.com/%s/releases/tag/%s" % (DEPOT, tag))
-
-
-def maj_page_github():
-    """Met à jour la page GitHub Pages (docs/index.html) et la POUSSE. Le numéro
-    de version y est déjà dynamique (lu via l'API GitHub côté client) ; ici on
-    rafraîchit son repli figé et on pousse, pour que la page soit à jour à chaque
-    publication. On ne commit QUE docs/index.html (le reste du code reste local,
-    selon la discipline d'historique). À appeler APRÈS publier() : committer avant
-    ferait échouer le garde-fou d'horodatage de l'installeur."""
+def _maj_page_version():
+    """Aligne le repli figé du numéro de version dans docs/index.html (le
+    numéro affiché est déjà dynamique via l'API GitHub, ceci n'est que le
+    repli). MODIFIE LE FICHIER SEULEMENT : la modification part dans le commit
+    unique « Arboriane X.Y.Z » de publier() — fini le commit séparé
+    « Page : version X » qui doublait l'historique."""
     page = os.path.join(RACINE, "docs", "index.html")
     try:
         txt = open(page, encoding="utf-8").read()
@@ -332,20 +385,90 @@ def maj_page_github():
                   r"\g<1>" + VERSION + r"\g<2>", txt)
     if neuf != txt:
         open(page, "w", encoding="utf-8").write(neuf)
-    if subprocess.run(["git", "diff", "--quiet", "--", "docs/index.html"],
-                      cwd=RACINE).returncode == 0:
-        log("page GitHub : déjà à jour (rien à pousser)")
-        return
-    for cmd in (["git", "add", "docs/index.html"],
-                ["git", "commit", "-m", "Page : version " + VERSION, "--", "docs/index.html"],
-                ["git", "push", "origin", "main"]):
-        r = subprocess.run(cmd, cwd=RACINE, capture_output=True, text=True,
-                           encoding="utf-8", errors="replace")
+        log("docs/index.html -> %s (ira dans le commit de release)" % VERSION)
+
+
+def publier():
+    """Publie la release vX.Y.Z sur GitHub — UNIQUEMENT via cet outil.
+
+    ⚠ INTERDICTION de publier « à la main » avec gh (release create/upload
+    depuis un terminal). C'est arrivé pour la v1.9.10 : publiée hors outil,
+    donc sans barrière de tests, sans commit ni tag poussés, et sans notes de
+    version — le « Quoi de neuf » et le CHANGELOG ont pris cinq versions de
+    retard (1.9.6 → 1.9.10, rattrapées le 2026-07-19). Le déployeur est le
+    SEUL chemin de publication : tests verts, CHANGELOG vérifié, code source
+    du tag = binaire publié, empreinte SHA-256.
+
+    Étapes — refus à la moindre anomalie :
+      1. l'arbre git était PROPRE avant le build (exiger_arbre_propre) ;
+      2. la release n'existe PAS déjà côté DISTANT — si elle existe : ARRÊT,
+         jamais de --clobber ; pour corriger un binaire publié, on MONTE la
+         version (le fichier téléchargé par les utilisateurs ne doit jamais
+         changer sous un même numéro) ;
+      3. l'installeur n'est pas plus ancien que le dernier commit (asset
+         périmé = la panne du 2026-07-09) ;
+      4. docs/index.html aligné, puis UN SEUL commit « Arboriane X.Y.Z »
+         (git add -A : uniquement ce que l'outil a produit, cf. étape 1),
+         tag vX.Y.Z, et push origin main --tags — si le push échoue, RIEN
+         n'est publié ;
+      5. gh release create, ciblée (--target) sur le commit du tag.
+    """
+    tag = "v" + VERSION
+    if not _ARBRE_VERIFIE_PROPRE:
+        raise SystemExit(
+            "ARRÊT : l'arbre git n'a pas été contrôlé propre avant le build "
+            "(barrière contournée ?). Publication refusée — relancez avec "
+            "--release SANS --sans-barriere.")
+    if _release_distante_existe(tag):
+        raise SystemExit(
+            "ARRÊT : la release %s existe DÉJÀ sur GitHub.\n"
+            "On ne remplace JAMAIS un binaire publié (pas de --clobber) : les "
+            "utilisateurs et l'empreinte SHA-256 s'y fient. Pour corriger, "
+            "montez VERSION dans core/version.py, ajoutez ses notes dans "
+            "services/maj.py, et republiez." % tag)
+    asset_ts = int(os.path.getmtime(INSTALLEUR))
+    if asset_ts < _dernier_commit_ts():
+        raise SystemExit("Installeur plus ancien que le dernier commit : "
+                         "recompile-le AVANT de publier (asset périmé).")
+    fichier_somme, somme = _ecrire_empreinte()
+
+    # Commit de release UNIQUE : version_info.txt, installateur.iss,
+    # CHANGELOG.md, docs/index.html… tout ce que l'outil vient de produire.
+    _maj_page_version()
+    r = _git(["add", "-A"])
+    if r.returncode != 0:
+        raise SystemExit("ARRÊT : git add a échoué (%s)." % (r.stderr or "").strip()[:200])
+    if (_git(["status", "--porcelain"]).stdout or "").strip():
+        r = _git(["commit", "-m", "Arboriane " + VERSION])
         if r.returncode != 0:
-            log("page GitHub : étape « %s » a échoué (%s) — à pousser à la main."
-                % (" ".join(cmd[:2]), (r.stderr or "").strip()[:140]))
-            return
-    log("page GitHub Pages mise à jour et poussée (docs/index.html)")
+            raise SystemExit("ARRÊT : commit de release impossible :\n"
+                             + (r.stderr or r.stdout or ""))
+        log("commit de release : « Arboriane %s »" % VERSION)
+    r = _git(["tag", tag])
+    if r.returncode != 0:
+        raise SystemExit("ARRÊT : impossible de poser le tag %s :\n%s"
+                         % (tag, r.stderr or ""))
+    r = _git(["push", "origin", "main", "--tags"])
+    if r.returncode != 0:
+        raise SystemExit(
+            "ARRÊT : push refusé (%s).\nRIEN n'est publié tant que le dépôt "
+            "distant n'a pas le commit et le tag : le code source public doit "
+            "correspondre EXACTEMENT au binaire téléchargeable."
+            % (r.stderr or "").strip()[:300])
+    log("commit + tag %s poussés sur origin/main" % tag)
+
+    # SHA du commit taggé : la release est épinglée dessus (--target), le
+    # binaire publié correspond donc exactement à ce code source.
+    sha = (_git(["rev-parse", tag + "^{commit}"]).stdout or "").strip()
+    log("création de la release %s + installeur + empreinte…" % tag)
+    cmd = [GH, "release", "create", tag, INSTALLEUR, fichier_somme,
+           "--repo", DEPOT, "--title", "Arboriane " + VERSION,
+           "--target", sha, "--notes", _notes(somme)]
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                       errors="replace")
+    if r.returncode != 0:
+        raise SystemExit("Publication GitHub échouée :\n" + (r.stderr or ""))
+    log("publié : https://github.com/%s/releases/tag/%s" % (DEPOT, tag))
 
 
 def _lancer(titre, cmd, cwd=RACINE):
@@ -406,11 +529,21 @@ def barriere(release):
     if not release:
         return
 
+    # PUB-01 : arbre PROPRE exigé AVANT le build — le commit de release
+    # (git add -A dans publier()) n'embarquera que ce que l'outil produit.
+    exiger_arbre_propre()
+
     if _tag_existe("v" + VERSION):
         raise SystemExit(
             "ARRÊT : la version %s est déjà publiée (tag v%s).\n"
             "Montez VERSION dans core/version.py, et ajoutez ses notes dans "
             "services/maj.py." % (VERSION, VERSION))
+    if _release_distante_existe("v" + VERSION):
+        raise SystemExit(
+            "ARRÊT : la release v%s existe déjà sur GitHub (même sans tag "
+            "local — publication faite hors outil ?). Montez VERSION dans "
+            "core/version.py ; on ne remplace jamais un binaire publié."
+            % VERSION)
 
     _lancer("barrière : corpus GEDCOM (non-régression sur fichiers réels)…",
             [sys.executable, "-X", "utf8",
@@ -439,8 +572,7 @@ def main():
     verifier()
     if "--release" in args:                  # publication atomique (exe + installeur)
         construire_installateur()
-        publier()
-        maj_page_github()                    # page GitHub Pages à jour (APRÈS publier)
+        publier()                            # commit unique (page incluse) + tag + push + release
     log("Terminé : version %s déployée et vérifiée." % VERSION)
 
 

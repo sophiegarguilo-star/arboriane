@@ -11,12 +11,14 @@
   --sauge-pale:  #e4ece1;
   --ivoire:      #f7f4ec;   /* fond */
   --blanc:       #fffdf8;   /* cartes */
-  --accent:      #c76b2a;   /* terracotta */
+  --accent:      #b25e22;   /* terracotta (AA 4,7:1 sur blanc — audit A11Y-03) */
+  --accent-vif:  #c76b2a;   /* décor uniquement (barres, filets) */
   --accent-or:   #d99a3c;
   --accent-pale: #f3e4d2;
   --texte:       #2a2b28;
-  --gris:        #6b7280;
-  --gris-clair:  #9aa0a6;
+  --gris:        #5d6570;   /* AA ~5,2:1 sur ivoire (audit A11Y-03) */
+  --gris-clair:  #9aa0a6;   /* filets décoratifs UNIQUEMENT */
+  --gris-clair-texte: #7d858c; /* petit texte secondaire lisible */
   --bord:        #e4e1d6;
   --homme:       #d2e2f1;
   --femme:       #f2d9e2;
@@ -122,7 +124,7 @@ html, body {
   padding: 9px 16px; border: 1px solid transparent;
   background: var(--accent); color: #fff; font-weight: 600;
 }
-.bouton:hover { background: #b25e22; }
+.bouton:hover { background: #9a4f1b; }
 .bouton.secondaire { background: var(--blanc); color: var(--vert); border-color: var(--bord); }
 .bouton.secondaire:hover { border-color: var(--sauge); background: var(--sauge-pale); }
 .bouton.petit { padding: 5px 11px; font-size: 13px; }
@@ -210,7 +212,9 @@ input, select, textarea {
 }
 input:focus, select:focus, textarea:focus, .onglet:focus-visible,
 .bouton:focus-visible, .lien:focus-visible, [tabindex]:focus-visible {
-  outline: 2px solid var(--accent-or); outline-offset: 1px;
+  /* Focus VISIBLE (audit A11Y-04) : vert de charte ~9:1 ; halo or décoratif. */
+  outline: 2px solid var(--vert); outline-offset: 2px;
+  box-shadow: 0 0 0 1px var(--accent-or);
 }
 label { font-size: 13px; color: var(--gris); display: block; margin-bottom: 3px; }
 .champ { margin-bottom: 12px; }
@@ -303,6 +307,10 @@ label { font-size: 13px; color: var(--gris); display: block; margin-bottom: 3px;
 .toast {
   background: var(--vert); color: #fff; padding: 11px 18px; border-radius: 999px;
   box-shadow: var(--ombre); font-size: 14px; max-width: 80vw;
+}
+/* Une erreur ne ressemble pas à un succès (DES-01) : fond alerte + liseré. */
+.toast.erreur {
+  background: var(--alerte); border: 2px solid #7d3a12; font-weight: 600;
 }
 
 /* ── Responsive raisonnable ──────────────────────────────────────────── */

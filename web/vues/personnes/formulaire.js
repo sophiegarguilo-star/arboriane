@@ -7,7 +7,7 @@
 // — pré-rempli quand on vient d'un bouton de fiche, « à déterminer » sinon — et
 // de CRÉER une nouvelle personne complète ou de RELIER quelqu'un déjà dans l'arbre.
 import { h, vider } from "../../noyau/dom.js";
-import { aller, peutRevenir, retour as retourHistorique } from "../../noyau/etat.js";
+import { aller, peutRevenir, retour as retourHistorique, gardeSaisie } from "../../noyau/etat.js";
 import { apiGet, apiJson } from "../../noyau/api.js";
 import { toast } from "../../composants/toast.js";
 import { champDate } from "../../composants/champDate.js";
@@ -50,6 +50,13 @@ export async function vueFormulaire(vue, { editer, lien } = {}) {
     : ((lien && lien.ancre) ? { fiche: lien.ancre } : null);
   const retour = () => (peutRevenir() ? retourHistorique() : aller("personnes", repliArg));
   vue.append(h("button", { class: "bouton secondaire petit", onclick: retour }, "← Retour"));
+
+  // Garde « modifications non enregistrées » (UX-02) : toute saisie arme le
+  // garde du routeur ; un enregistrement réussi le désarme (gardeSaisie(null)).
+  let saisieModifiee = false;
+  vue.addEventListener("input", () => { saisieModifiee = true; });
+  vue.addEventListener("change", () => { saisieModifiee = true; });
+  gardeSaisie(() => saisieModifiee);
   const titre = editer ? "Modifier une personne"
     : (LIBELLE_TITRE[lien && lien.type] || "Nouvelle personne");
   vue.append(h("h1", {}, titre));
@@ -84,10 +91,10 @@ export async function vueFormulaire(vue, { editer, lien } = {}) {
   const fHeureDec = h("input", { value: (ind.deces || {}).heure || "",
     placeholder: "heure (facultatif, ex. 4:00)", style: "width:100%" });
   const blocDeces = h("div", {},
-    h("div", { class: "champ" }, h("label", {}, "Décès — date"), dDec.element),
-    h("div", { class: "champ" }, h("label", {}, "Décès — heure"), fHeureDec),
-    h("div", { class: "champ" }, h("label", {}, "Décès — lieu"), lDec.element),
-    h("div", { class: "champ" }, h("label", {}, "Décès — cause"), fCause));
+    ligneChamp("Décès — date", dDec.element),
+    ligneChamp("Décès — heure", fHeureDec),
+    ligneChamp("Décès — lieu", lDec.element),
+    ligneChamp("Décès — cause", fCause));
   function majDeces() {
     // on masque le décès seulement si la personne est explicitement vivante
     blocDeces.style.display = fStatut.value === "vivant" ? "none" : "block";
@@ -101,9 +108,9 @@ export async function vueFormulaire(vue, { editer, lien } = {}) {
     h("div", { style: "display:flex;gap:12px;flex-wrap:wrap" },
       ligneChamp("Sexe", fSexe),
       h("div", { class: "champ", style: "flex:1;min-width:180px" }, h("label", {}, "Statut de vie"), fStatut)),
-    h("div", { class: "champ" }, h("label", {}, "Naissance — date"), dNais.element),
-    h("div", { class: "champ" }, h("label", {}, "Naissance — heure"), fHeureNais),
-    h("div", { class: "champ" }, h("label", {}, "Naissance — lieu"), lNais.element),
+    ligneChamp("Naissance — date", dNais.element),
+    ligneChamp("Naissance — heure", fHeureNais),
+    ligneChamp("Naissance — lieu", lNais.element),
     blocDeces);
 
   // ── P1 · Identité détaillée ────────────────────────────────────────────
@@ -145,7 +152,7 @@ export async function vueFormulaire(vue, { editer, lien } = {}) {
     ligneChamp("Prénoms secondaires", fSecondaires),
     ligneChamp("Surnom (« dit »)", fSurnom),
     ligneChamp("Nom marital", fMarital),
-    h("div", { class: "champ" }, h("label", {}, "Variantes / autres noms"), variantes.element));
+    ligneChamp("Variantes / autres noms", variantes.element));
 
   // ── P3 · Faits de vie ──────────────────────────────────────────────────
   const professions = listeRepetable({
@@ -212,9 +219,9 @@ export async function vueFormulaire(vue, { editer, lien } = {}) {
   });
 
   const blocFaits = blocAvance("Faits de vie — événements, professions, résidences",
-    h("div", { class: "champ" }, h("label", {}, "Événements & attributs"), evenements.element),
-    h("div", { class: "champ" }, h("label", {}, "Professions"), professions.element),
-    h("div", { class: "champ" }, h("label", {}, "Résidences"), residences.element));
+    ligneChamp("Événements & attributs", evenements.element),
+    ligneChamp("Professions", professions.element),
+    ligneChamp("Résidences", residences.element));
 
   // ── P4 · Recherche & confidentialité ───────────────────────────────────
   const fTags = h("input", { value: (ind.tags || []).join(", "),
@@ -237,7 +244,7 @@ export async function vueFormulaire(vue, { editer, lien } = {}) {
 
   const blocRecherche = blocAvance("Recherche & confidentialité — tags, pistes, référence, accès",
     ligneChamp("Tags", fTags),
-    h("div", { class: "champ" }, h("label", {}, "Pistes de recherche"), pistes.element),
+    ligneChamp("Pistes de recherche", pistes.element),
     h("div", { style: "display:flex;gap:12px;flex-wrap:wrap" },
       h("div", { class: "champ", style: "flex:1;min-width:180px" }, h("label", {}, "Référence personnelle"), fRefn),
       h("div", { class: "champ", style: "min-width:180px" }, h("label", {}, "Confidentialité"), fResn)));
@@ -311,7 +318,7 @@ export async function vueFormulaire(vue, { editer, lien } = {}) {
   const zoneRelier = h("div", { style: "display:none" },
     h("div", { class: "carte" },
       h("h2", { style: "margin-top:0" }, "Relier une personne déjà dans l'arbre"),
-      h("div", { class: "champ" }, h("label", {}, "Personne"), relierPicker.element)));
+      ligneChamp("Personne", relierPicker.element)));
 
   selLien.addEventListener("change", () => majLien());
 
@@ -382,15 +389,17 @@ export async function vueFormulaire(vue, { editer, lien } = {}) {
     try {
       if (editer) {
         await apiJson("/api/individus/" + editer, "PUT", champs);
+        gardeSaisie(null);
         toast("Modifications enregistrées.");
         aller("personnes", { fiche: editer });
       } else {
         const r = await apiJson("/api/individus", "POST", { ...champs, non_identifiee: !!nonIdentifiee });
+        gardeSaisie(null);
         toast("Personne créée.");
         aller("personnes", { fiche: r.id });
       }
     } catch (e) {
-      toast(e.message, { duree: 6000 });
+      toast(e.message, { type: "erreur", duree: 6000 });
       enCours = false;
     }
   }
@@ -424,10 +433,11 @@ export async function vueFormulaire(vue, { editer, lien } = {}) {
     enCours = true;
     try {
       const r = await apiJson(url, "POST", corps);
+      gardeSaisie(null);
       toast("Personne reliée.");
       aller("personnes", { fiche: (r && r.id) || ancre });
     } catch (e) {
-      toast(e.message, { duree: 6000 });
+      toast(e.message, { type: "erreur", duree: 6000 });
       enCours = false;
     }
   }

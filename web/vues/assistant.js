@@ -71,7 +71,7 @@ export async function vueAssistant(vue) {
             await apiJson("/api/carnet", "POST",
               { type: "ia", titre: "Brouillon IA", texte });
             toast("Enregistré dans le carnet.");
-          } catch (e) { toast(e.message); }
+          } catch (e) { toast(e.message, { type: "erreur" }); }
         } }, "📔 Enregistrer au carnet"))));
   }
 }

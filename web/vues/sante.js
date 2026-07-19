@@ -1,5 +1,5 @@
 // Onglet Santé de l'arbre — solidité documentaire, ton encourageant.
-import { h } from "../noyau/dom.js";
+import { h, actionnable } from "../noyau/dom.js";
 import { aller } from "../noyau/etat.js";
 import { apiGet } from "../noyau/api.js";
 import { badge } from "../composants/badge.js";
@@ -23,18 +23,18 @@ export async function vueSante(vue) {
     stat(s.pistes_ouvertes, "pistes ouvertes")));
 
   controle(vue, "Personnes sans aucune source", s.personnes_sans_source,
-    (it) => h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: it.id }) },
-      h("strong", {}, it.nom), it.periode ? h("span", { class: "meta" }, it.periode) : null),
+    (it) => actionnable(h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: it.id }) },
+      h("strong", {}, it.nom), it.periode ? h("span", { class: "meta" }, it.periode) : null)),
     "Rien ne prouve encore ce qu'on affirme sur elles. Ouvrez la fiche → « Prouver ».");
 
   controle(vue, "Sources sans scan", s.sources_sans_scan,
-    (it) => h("div", { class: "ligne-pers", onclick: () => aller("actes", { source: it.id }) },
-      h("strong", {}, it.titre)),
+    (it) => actionnable(h("div", { class: "ligne-pers", onclick: () => aller("actes", { source: it.id }) },
+      h("strong", {}, it.titre))),
     "La source existe mais aucune image n'y est rattachée. Ajoutez le scan quand vous l'avez.");
 
   controle(vue, "Sources reliées à rien", s.sources_inutiles,
-    (it) => h("div", { class: "ligne-pers", onclick: () => aller("actes", { source: it.id }) },
-      h("strong", {}, it.titre)),
+    (it) => actionnable(h("div", { class: "ligne-pers", onclick: () => aller("actes", { source: it.id }) },
+      h("strong", {}, it.titre))),
     "Ces sources ne prouvent aucun fait : à relier à une personne, ou à retirer.");
 }
 

@@ -39,9 +39,24 @@ def lister(app, params, corps):
 @route("GET", r"^/api/individus/(?P<pid>[A-Za-z0-9]+)$")
 def fiche(app, params, corps, pid):
     racine = app.manifeste.get("racine_id") if app.manifeste else None
-    f = personnes.fiche(_base(app), pid, racine)
+    base = _base(app)
+    f = personnes.fiche(base, pid, racine)
     if not f:
         return (404, {"erreur": "Personne introuvable."})
+    # MET-01 : type de filiation (adoption / accueil / probable) lisible par la
+    # fiche — côté personne (son lien à SES parents, lu dans ses familles famc)
+    # et côté unions (le lien de chacun de ses enfants, fam["pedi"]).
+    fams = base.donnees["familles"]
+    f["filiation"] = ""
+    for fid in f.get("famc") or []:
+        t = ((fams.get(fid) or {}).get("pedi") or {}).get(pid)
+        if t:
+            f["filiation"] = t
+            break
+    for u in f.get("unions") or []:
+        pedi = (fams.get(u.get("famille")) or {}).get("pedi")
+        if pedi:
+            u["pedi"] = dict(pedi)
     return f
 
 
@@ -95,6 +110,22 @@ def supprimer(app, params, corps, pid):
     if inds and not app.racine_valide():
         app.garantir_racine(next(iter(inds)))
     return {"ok": True}
+
+
+@route("POST", r"^/api/individus/restaurer-dernier$")
+def restaurer_dernier(app, params, corps):
+    """Annule la DERNIÈRE suppression de personne : l'instantané le plus récent
+    de <arbre>/Corbeille/ est rejoué — la personne revient sous son id
+    d'origine, avec ses liens dans les familles encore existantes."""
+    base = _base(app)
+    ind = base.restaurer_dernier_supprime()
+    if not ind:
+        return (404, {"erreur": "Aucune suppression récente à annuler."})
+    # Si l'arbre s'était retrouvé sans racine valide, la personne restaurée
+    # peut la reprendre (même auto-réparation qu'à la création).
+    app.garantir_racine(ind["id"])
+    from core.modele import nom_complet
+    return {"ok": True, "id": ind["id"], "nom": nom_complet(ind)}
 
 
 @route("PUT", r"^/api/individus/(?P<pid>[A-Za-z0-9]+)/medias$")

@@ -1,8 +1,9 @@
 // Écran « Actes / Sources » — la liste et son tableau de bord.
 // Deux sous-vues : « Documents & actes » (avec pièces) et « Toutes les sources ».
-import { h, vider } from "../../noyau/dom.js";
+import { h, vider, actionnable } from "../../noyau/dom.js";
 import { aller } from "../../noyau/etat.js";
 import { apiGet } from "../../noyau/api.js";
+import { normaliser } from "../../noyau/texte.js";
 import { badge } from "../../composants/badge.js";
 import { STATUTS, STATUT_LABEL, FIAB, exportCsv } from "./commun.js";
 import { champPersonne } from "../../composants/champ.js";
@@ -90,8 +91,8 @@ export async function vueActes(vue, arg) {
     vider(zone);
     let lst = data.sources.slice();
     if (sousVue === "documents") lst = lst.filter((s) => s.nb_fichiers > 0 || filtres.orphelins);
-    const q = filtres.q.trim().toLowerCase();
-    if (q) lst = lst.filter((s) => (s.titre + s.lieu + s.cote).toLowerCase().includes(q));
+    const q = normaliser(filtres.q.trim());
+    if (q) lst = lst.filter((s) => normaliser(s.titre + s.lieu + s.cote).includes(q));
     if (filtres.type) lst = lst.filter((s) => s.type === filtres.type);
     if (filtres.statut) lst = lst.filter((s) => s.statut === filtres.statut);
     if (filtres.personne) lst = lst.filter((s) => (s.personnes || []).includes(filtres.personne));
@@ -137,7 +138,7 @@ export async function vueActes(vue, arg) {
 }
 
 function carteSource(s) {
-  return h("div", { class: "carte-arbre", onclick: () => detail(s.id), style: "cursor:pointer" },
+  return actionnable(h("div", { class: "carte-arbre", onclick: () => detail(s.id), style: "cursor:pointer" },
     h("div", { class: "nom" }, s.titre),
     h("div", { class: "rangee serre" },
       s.type ? badge(s.type, "info") : null,
@@ -148,5 +149,5 @@ function carteSource(s) {
     h("div", { style: "color:var(--gris);font-size:13px" },
       [s.date, s.lieu, s.cote].filter(Boolean).join(" · ") || "—"),
     s.nb_personnes ? h("div", { style: "font-size:12px;color:var(--gris-clair)" },
-      "👥 " + s.nb_personnes + " personne(s) citée(s)") : null);
+      "👥 " + s.nb_personnes + " personne(s) citée(s)") : null));
 }

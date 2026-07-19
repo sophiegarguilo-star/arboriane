@@ -17,6 +17,19 @@ import os
 import shutil
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+
+class ServeurArboriane(ThreadingHTTPServer):
+    """ThreadingHTTPServer SANS partage de port.
+
+    La stdlib pose allow_reuse_address=True (SO_REUSEADDR) ; sous Windows, cela
+    permet à un DEUXIÈME processus de se lier à un port déjà occupé sans OSError.
+    Conséquence vécue (audit 2026-07-18) : deux instances Arboriane (ex. app
+    installée + app DEV) écoutaient toutes deux le port 8770 et le navigateur
+    pouvait lire/ÉCRIRE dans le mauvais arbre. En désactivant la réutilisation,
+    le bind échoue franchement quand le port est pris, et la boucle « port
+    suivant » de demarrer() fait son travail comme prévu."""
+    allow_reuse_address = False
 from urllib.parse import urlparse, parse_qs
 
 from core import instance
@@ -232,7 +245,7 @@ def demarrer(port=None, ouvrir_navigateur=True):
     serveur = None
     for essai in range(port, port + 50):
         try:
-            serveur = ThreadingHTTPServer(("127.0.0.1", essai), Gestionnaire)
+            serveur = ServeurArboriane(("127.0.0.1", essai), Gestionnaire)
             port = essai
             break
         except OSError:

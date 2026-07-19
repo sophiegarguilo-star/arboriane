@@ -93,7 +93,16 @@ def lister(base, racine_id=None):
     """Résumés de toutes les personnes (tri nom + prénom). Ajoute, quand une
     personne de référence est connue : le numéro Sosa et la branche (côté +
     nom du grand-parent) — pour les vues « Ligne directe » et « Par branche » —
-    ainsi que la catégorie de parenté (directe / élargie / hors famille)."""
+    ainsi que la catégorie de parenté (directe / élargie / hors famille).
+
+    Mise en cache sur la Base : le calcul (Sosa + catégories, coûteux sur un
+    gros arbre) n'est refait que si la base a changé (`base.version`, incrémenté
+    par sauvegarder()/remplacer() — point unique de toutes les mutations) ou si
+    la racine demandée change. Le résultat rendu ne doit pas être modifié."""
+    jeton = (getattr(base, "version", None), racine_id)
+    cache = getattr(base, "_cache_lister", None)
+    if cache is not None and cache[0] == jeton:
+        return cache[1]
     inds = base.donnees["individus"]
     sosa_map = (modele.sosa_par_individu(base.donnees, racine_id)
                 if racine_id and racine_id in inds else {})
@@ -114,6 +123,7 @@ def lister(base, racine_id=None):
         r["categorie"] = cats.get(ind["id"])
         lignes.append(r)
     lignes.sort(key=lambda r: (r["nom_famille"].lower(), r["prenoms"].lower()))
+    base._cache_lister = (jeton, lignes)
     return lignes
 
 

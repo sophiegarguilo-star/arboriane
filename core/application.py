@@ -60,6 +60,8 @@ class Application:
         tmp = self.registre + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(r, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())     # vraiment sur le disque avant le replace
         os.replace(tmp, self.registre)
 
     def _memoriser(self, chemin, actif=True):
@@ -513,6 +515,8 @@ class Application:
         tmp = self._fichier_reglages + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(r, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())     # vraiment sur le disque avant le replace
         os.replace(tmp, self._fichier_reglages)
 
     def lire_reglages(self):

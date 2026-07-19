@@ -74,6 +74,8 @@ def sauver_manifeste(chemin, manifeste):
     tmp = os.path.join(chemin, MANIFESTE + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(manifeste, f, ensure_ascii=False, indent=2)
+        f.flush()
+        os.fsync(f.fileno())      # vraiment sur le disque avant le replace
     os.replace(tmp, os.path.join(chemin, MANIFESTE))
 
 

@@ -13,6 +13,50 @@ et fams/famc de tous les individus sont recalculés depuis la table des familles
 """
 
 from core import modele
+from core.validation import ErreurValidation
+
+
+# ── Garde anti-cycle : ligne directe ───────────────────────────────────────
+def _ascendants(donnees, pid):
+    """Ids de TOUS les ascendants de pid (parcours famc, toutes familles),
+    avec ensemble de visite (robuste même si la base contient déjà un cycle)."""
+    inds, fams = donnees["individus"], donnees["familles"]
+    vus, pile = set(), [pid]
+    while pile:
+        cur = pile.pop()
+        for fid in (inds.get(cur) or {}).get("famc", []) or []:
+            fam = fams.get(fid) or {}
+            for role in ("mari", "epouse"):
+                q = fam.get(role)
+                if q and q not in vus:
+                    vus.add(q)
+                    pile.append(q)
+    vus.discard(pid)
+    return vus
+
+
+def _descendants(donnees, pid):
+    """Ids de TOUS les descendants de pid (parcours fams → enfants)."""
+    inds, fams = donnees["individus"], donnees["familles"]
+    vus, pile = set(), [pid]
+    while pile:
+        cur = pile.pop()
+        for fid in (inds.get(cur) or {}).get("fams", []) or []:
+            for e in (fams.get(fid) or {}).get("enfants", []) or []:
+                if e and e not in vus:
+                    vus.add(e)
+                    pile.append(e)
+    vus.discard(pid)
+    return vus
+
+
+def en_ligne_directe(donnees, ida, idb):
+    """Vrai si ida et idb sont en LIGNE DIRECTE (l'un est dans l'ascendance ou
+    la descendance de l'autre). Fusionner deux telles personnes créerait un
+    cycle de filiation (quelqu'un deviendrait son propre ancêtre)."""
+    if not ida or not idb or ida == idb:
+        return False
+    return idb in _ascendants(donnees, ida) or idb in _descendants(donnees, ida)
 
 
 # ── Helpers portés de la v1 (recréés ici, base v2 ne les fournit pas) ──────
@@ -67,6 +111,18 @@ def fusionner(base, garde_id, absorbe_id):
         inds = base.donnees["individus"]
         if garde_id == absorbe_id or garde_id not in inds or absorbe_id not in inds:
             return None
+        # Garde anti-cycle : refuser la fusion de deux personnes en ligne
+        # directe (parent/enfant, aïeul/petit-enfant…) — elle rendrait
+        # quelqu'un son propre ancêtre.
+        if en_ligne_directe(base.donnees, garde_id, absorbe_id):
+            raise ErreurValidation(
+                "Fusion refusée : « %s » et « %s » sont en ligne directe "
+                "(l'une est l'ancêtre de l'autre). Les fusionner créerait un "
+                "cycle de filiation — une personne deviendrait son propre "
+                "ancêtre. S'il s'agit d'homonymes (ex. père et fils de même "
+                "nom), ce ne sont pas des doublons." % (
+                    modele.nom_complet(inds[garde_id]),
+                    modele.nom_complet(inds[absorbe_id])))
         g, a = inds[garde_id], inds[absorbe_id]
         resume = {"garde": garde_id, "absorbe": absorbe_id, "champs_completes": []}
 

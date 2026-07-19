@@ -1,7 +1,7 @@
 // Onglet « Référentiel des lieux » (L15) — les lieux en hiérarchie (commune →
 // département → pays) avec des noms alternatifs datés. Couche parallèle : les
 // événements gardent leur texte, la carte existante n'est pas touchée.
-import { h, vider } from "../noyau/dom.js";
+import { h, vider, actionnable } from "../noyau/dom.js";
 import { apiGet, apiJson } from "../noyau/api.js";
 import { toast } from "../composants/toast.js";
 import { confirmer } from "../composants/modale.js";
@@ -31,7 +31,7 @@ async function recharger(cont) {
           const r = await apiJson("/api/lieux-ref/construire", "POST", {});
           toast(r.crees + " lieu(x) créé(s) — total " + r.total + ".");
           recharger(cont);
-        } catch (e) { toast(e.message); }
+        } catch (e) { toast(e.message, { type: "erreur" }); }
       },
     }, "✨ Construire depuis les événements")));
   if (!data.lieux.length) {
@@ -48,9 +48,9 @@ async function recharger(cont) {
 function ligne(l, cont, tous) {
   const meta = [l.type, l.noms_dates.length ? l.noms_dates.length + " nom(s) daté(s)" : ""]
     .filter(Boolean).join(" · ");
-  return h("div", { class: "ligne-pers", onclick: () => formulaire(cont, l, tous) },
+  return actionnable(h("div", { class: "ligne-pers", onclick: () => formulaire(cont, l, tous) },
     h("strong", {}, l.chemin || l.nom),
-    meta ? h("span", { class: "meta" }, meta) : null);
+    meta ? h("span", { class: "meta" }, meta) : null));
 }
 
 function champ(label, control) {
@@ -109,7 +109,7 @@ function formulaire(cont, l, tous) {
             if (edit) await apiJson("/api/lieux-ref/" + encodeURIComponent(l.id), "PUT", payload);
             else await apiJson("/api/lieux-ref", "POST", payload);
             toast("Lieu enregistré."); recharger(cont);
-          } catch (e) { toast(e.message); }
+          } catch (e) { toast(e.message, { type: "erreur" }); }
         },
       }, edit ? "Enregistrer" : "Créer"),
       edit ? h("button", {
@@ -121,7 +121,7 @@ function formulaire(cont, l, tous) {
           try {
             await apiJson("/api/lieux-ref/" + encodeURIComponent(l.id), "DELETE", {});
             toast("Lieu supprimé."); recharger(cont);
-          } catch (e) { toast(e.message); }
+          } catch (e) { toast(e.message, { type: "erreur" }); }
         },
       }, "Supprimer") : null,
       h("button", { class: "bouton secondaire", onclick: () => recharger(cont) }, "Annuler"))));

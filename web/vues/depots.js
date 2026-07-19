@@ -32,7 +32,7 @@ async function recharger(cont) {
           const r = await apiJson("/api/depots/promouvoir", "POST", {});
           toast(r.crees + " dépôt(s) créé(s), " + r.lies + " source(s) reliée(s).");
           recharger(cont);
-        } catch (e) { toast(e.message); }
+        } catch (e) { toast(e.message, { type: "erreur" }); }
       },
     }, "✨ Promouvoir depuis les sources")));
   if (!data.depots.length) {
@@ -70,7 +70,7 @@ function carteDepot(d, cont) {
         try {
           await apiJson("/api/depots/" + encodeURIComponent(d.id), "DELETE", {});
           toast("Dépôt supprimé."); recharger(cont);
-        } catch (e) { toast(e.message); }
+        } catch (e) { toast(e.message, { type: "erreur" }); }
       } }, "Supprimer")));
   return c;
 }
@@ -110,7 +110,7 @@ function formulaire(cont, d) {
             if (edit) await apiJson("/api/depots/" + encodeURIComponent(d.id), "PUT", payload);
             else await apiJson("/api/depots", "POST", payload);
             toast("Dépôt enregistré."); recharger(cont);
-          } catch (e) { toast(e.message); }
+          } catch (e) { toast(e.message, { type: "erreur" }); }
         },
       }, edit ? "Enregistrer" : "Créer"),
       h("button", { class: "bouton secondaire", onclick: () => recharger(cont) }, "Annuler"))));

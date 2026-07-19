@@ -14,6 +14,7 @@ import zipfile
 from routes import route
 from services import fusion, rameau, import_avance
 from core import espace as espace_mod
+from core.gedcom import bilan as bilan_gedcom
 from core.fichiers import nom_sur
 from core.validation import ErreurValidation
 
@@ -81,6 +82,8 @@ def comparer_detaille(app, params, corps):
         gedcom_charset.journaliser(app.espace_chemin, enc.get("charset"),
                                    enc.get("fiable"), texte)
     res = import_avance.comparer_detaille(app, texte)
+    # Balises niveau 1-2 non reconnues : montrées dès l'aperçu (PARC-11).
+    res["non_lues"] = bilan_gedcom.compter_non_reconnues(texte)
     if enc:
         res["encodage"] = enc
     return res
@@ -98,7 +101,10 @@ def import_fusionner(app, params, corps):
         gedcom_charset.journaliser(app.espace_chemin, enc.get("charset"),
                                    enc.get("fiable"), texte)
     corr = (corps or {}).get("corrections_lieux") or None
-    return {"ok": True, **import_avance.fusionner_import(app, texte, corr)}
+    res = import_avance.fusionner_import(app, texte, corr)
+    # Balises niveau 1-2 non reconnues du fichier entrant (PARC-11).
+    res["non_lues"] = bilan_gedcom.compter_non_reconnues(texte)
+    return {"ok": True, **res}
 
 
 @route("POST", r"^/api/espaces/dupliquer$")

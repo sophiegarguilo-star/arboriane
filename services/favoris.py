@@ -76,8 +76,9 @@ def membres(donnees, eid):
 
 def creer_ensemble(base, nom, ids=None):
     with base._verrou:
-        ens = _ens(base.donnees)
-        eid = modele.nouvel_id(ens, "E")
+        ens = _ens(base.donnees)          # garantit la table
+        # id monotone persisté (meta.compteurs) : jamais réutilisé après suppression
+        eid = modele.nouvel_id_monotone(base.donnees, "ensembles", "E")
         ens[eid] = {"id": eid, "nom": (nom or "").strip() or "Nouvel ensemble",
                     "membres": [i for i in (ids or []) if i in base.donnees["individus"]]}
         base.sauvegarder()

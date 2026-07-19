@@ -113,7 +113,7 @@ def _sablier(donnees, ident, gen_asc, gen_desc, o):
         fond, trait = COULEURS.get(sexe, COULEURS["U"]), TRAIT.get(sexe, TRAIT["U"])
         x, y = cx - cw / 2, cy - ch / 2
         parts.append('<g class="indi" data-id="%s"%s><title>%s</title>'
-                     % (pid, ' data-root="1"' if racine else "", _echap(modele.nom_complet(ind))))
+                     % (pid, ' data-root="1"' if racine else "", _titre_carte(ind)))
         parts.append('<rect x="%g" y="%g" width="%g" height="%g" rx="9" fill="%s" '
                      'stroke="%s" stroke-width="%g"/>'
                      % (x, y, cw, ch, fond, trait, 3 if racine else 1.2))

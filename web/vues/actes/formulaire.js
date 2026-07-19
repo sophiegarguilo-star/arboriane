@@ -10,7 +10,8 @@
 // lit dans la liste), le nom de fichier nomme (il se trie dans l'explorateur).
 // La règle de nommage vit côté serveur (services/nomenclature.py).
 import { h, vider } from "../../noyau/dom.js";
-import { aller } from "../../noyau/etat.js";
+import { aller, gardeSaisie } from "../../noyau/etat.js";
+import { confirmer } from "../../composants/modale.js";
 import { apiGet, apiJson } from "../../noyau/api.js";
 import { toast } from "../../composants/toast.js";
 import { champSource } from "../../composants/champSource.js";
@@ -31,8 +32,15 @@ export async function formulaire(src, opts = {}) {
   const retourAction = opts.retour ? opts.retour.action
     : (edit ? () => detail(src.id) : () => aller("actes"));
   const retourLabel = opts.retour ? ("← " + opts.retour.label) : "← Retour";
+  // ← Retour : detail() court-circuite le routeur, donc on pose la question
+  // « quitter sans enregistrer ? » ici même, puis on désarme le garde (UX-02).
   vue.append(h("button", { class: "bouton secondaire petit",
-    onclick: () => { nettoyerAbandon(); retourAction(); } }, retourLabel));
+    onclick: async () => {
+      if (saisieModifiee && !enregistre && !(await confirmer(
+        "Quitter sans enregistrer ? Vos modifications seront perdues.",
+        { titre: "Modifications non enregistrées", valider: "Quitter", danger: true }))) return;
+      gardeSaisie(null); nettoyerAbandon(); retourAction();
+    } }, retourLabel));
   vue.append(h("h1", {}, edit ? "Modifier la source"
     : (preuve ? "Prouver : " + preuve.libelle : "Nouvelle source")));
   src = src || {};
@@ -40,6 +48,10 @@ export async function formulaire(src, opts = {}) {
   // Les scans déposés ici puis abandonnés (annulation / retour) sont effacés du
   // disque par le bloc « pièces jointes » — sauf si la source a été enregistrée.
   let enregistre = false;
+  let saisieModifiee = false;
+  vue.addEventListener("input", () => { saisieModifiee = true; });
+  vue.addEventListener("change", () => { saisieModifiee = true; });
+  gardeSaisie(() => saisieModifiee);
   function nettoyerAbandon() {
     if (!enregistre) blocFichiers.nettoyerAbandon();
   }
@@ -112,7 +124,7 @@ export async function formulaire(src, opts = {}) {
   [["date", "Date"], ["lieu", "Lieu"], ["depot", "Dépôt"], ["cote", "Cote"],
    ["page", "Page"], ["ark", "Lien vers l'acte en ligne (ARK / URL)"]].forEach(([cle, lib]) => {
     if (cle === "lieu") {
-      carte.append(h("div", { class: "champ" }, h("label", {}, lib), champLieuSrc.element));
+      carte.append(ligneChamp(lib, champLieuSrc.element));
       return;
     }
     if (cle === "depot") {
@@ -122,7 +134,7 @@ export async function formulaire(src, opts = {}) {
     const inp = h("input", { value: src[cle] || "", style: "width:100%",
       placeholder: AIDE_SOURCE[cle] || "" });
     champs[cle] = inp;
-    carte.append(h("div", { class: "champ" }, h("label", {}, lib), inp));
+    carte.append(ligneChamp(lib, inp));
   });
 
   const selFiab = h("select", {}, ...[["", "—"], ["haute", "haute"], ["moyenne", "moyenne"], ["basse", "basse"]]
@@ -132,8 +144,8 @@ export async function formulaire(src, opts = {}) {
       selected: src.statut === v ? "selected" : null }, v ? (STATUT_LABEL[v] || v) : "—")));
   champs.fiabilite = selFiab; champs.statut = selStatut;
   carte.append(h("div", { style: "display:flex;gap:12px" },
-    h("div", { class: "champ" }, h("label", {}, "Fiabilité"), selFiab),
-    h("div", { class: "champ" }, h("label", {}, "Statut"), selStatut)));
+    ligneChamp("Fiabilité", selFiab),
+    ligneChamp("Statut", selStatut)));
 
   // ── 4. Scans, et leur nom sur le disque ──────────────────────────────
   const blocFichiers = blocScans(src.fichiers || [], { onChange: () => rafraichir() });
@@ -172,7 +184,7 @@ export async function formulaire(src, opts = {}) {
 
   const transSrc = h("textarea", { rows: 6, style: "width:100%",
     placeholder: "Transcription de l'acte…" }, src.transcription || "");
-  carte.append(h("div", { class: "champ" }, h("label", {}, "Transcription"), transSrc));
+  carte.append(ligneChamp("Transcription", transSrc));
 
   // ── Nomenclature : le serveur propose, l'écran affiche ───────────────
   let propositions = [];              // [{origine, propose}] pour les scans AJOUTÉS ici
@@ -265,7 +277,7 @@ export async function formulaire(src, opts = {}) {
     // déroulant de toutes les sources — utilisable avec des milliers d'entrées.
     const pickSource = champSource(sourcesExist, {});
     const blocEx = h("div", { class: "carte", style: "max-width:680px;display:none" },
-      h("div", { class: "champ" }, h("label", {}, "Source déjà créée"), pickSource.element));
+      ligneChamp("Source déjà créée", pickSource.element));
     let mode = "nouvelle";
     const majMode = () => {
       carte.style.display = mode === "nouvelle" ? "block" : "none";
@@ -303,7 +315,7 @@ export async function formulaire(src, opts = {}) {
             if (!corps.personnes.some((p) => p.id === preuve.pid)) {
               corps.personnes.unshift({ id: preuve.pid, role: "sujet" });
             }
-            const r = await apiJson("/api/sources", "POST", corps); sid = r.id; enregistre = true;
+            const r = await apiJson("/api/sources", "POST", corps); sid = r.id; enregistre = true; gardeSaisie(null);
           }
           // prouver le fait pour la personne de départ (union ciblée si besoin)
           await apiJson("/api/individus/" + preuve.pid + "/citer", "POST",
@@ -321,7 +333,7 @@ export async function formulaire(src, opts = {}) {
           }
           toast("Preuve ajoutée.");
           retourAction();
-        } catch (e) { toast(e.message); }
+        } catch (e) { toast(e.message, { type: "erreur" }); }
       } }, "Enregistrer et lier au fait"),
       h("button", { class: "bouton secondaire",
         onclick: () => { nettoyerAbandon(); retourAction(); } }, "Annuler")));
@@ -338,13 +350,13 @@ export async function formulaire(src, opts = {}) {
         if (!corps.titre) { toast("Donnez au moins un titre."); return; }
         if (edit) {
           await apiJson("/api/sources/" + src.id, "PUT", corps);
-          enregistre = true; toast("Source modifiée."); retourAction();
+          enregistre = true; gardeSaisie(null); toast("Source modifiée."); retourAction();
         } else {
           const r = await apiJson("/api/sources", "POST", corps);
-          enregistre = true; toast("Source créée.");
+          enregistre = true; gardeSaisie(null); toast("Source créée.");
           opts.retour ? retourAction() : detail(r.id);
         }
-      } catch (e) { toast(e.message); }
+      } catch (e) { toast(e.message, { type: "erreur" }); }
     } }, "Enregistrer"),
     h("button", { class: "bouton secondaire",
       onclick: () => { nettoyerAbandon(); retourAction(); } }, "Annuler")));

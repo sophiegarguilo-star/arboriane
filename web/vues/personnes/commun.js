@@ -121,14 +121,8 @@ export function lireBase64(fichier) {
   });
 }
 
-let _seqChamp = 0;
-export function ligneChamp(label, input) {
-  // Associe le libellé au champ (for/id) : clic sur le libellé = focus, et le
-  // lecteur d'écran annonce le nom du champ.
-  const id = input.id || ("champ-" + (++_seqChamp));
-  input.id = id;
-  return h("div", { class: "champ" }, h("label", { for: id }, label), input);
-}
+// ligneChamp vit désormais dans composants/ (A11Y-05) — ré-export compatible.
+export { ligneChamp } from "../../composants/ligneChamp.js";
 
 // bloc repliable (details) pour la saisie avancée
 export function blocAvance(titre, ...corps) {

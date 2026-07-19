@@ -8,6 +8,7 @@ famille ↔ individu. La source de vérité des liens est TOUJOURS la table des
 familles ; fams/famc des individus en découlent.
 """
 
+import copy
 import functools
 import json
 import os
@@ -36,21 +37,38 @@ class Base:
         self.dossier_sauvegardes = dossier_sauvegardes
         self._verrou = threading.RLock()
         self.donnees = modele.base_vide()
+        # Compteur de version : incrémenté à chaque écriture/rechargement. Sert
+        # de jeton d'invalidation aux caches de lecture (services/personnes).
+        self.version = 0
+        # "corrompu" si le JSON a dû être mis en quarantaine (bandeau UI futur).
+        self.avertissement = ""
         self.charger()
 
     # ── Chargement / sauvegarde ───────────────────────────────────────
     @_synchronise
     def charger(self):
+        self.avertissement = ""
         if os.path.exists(self.chemin):
             try:
                 with open(self.chemin, "r", encoding="utf-8") as f:
                     self.donnees = json.load(f)
-            except (OSError, ValueError) as e:
+            except OSError as e:
+                # Fichier momentanément INACCESSIBLE (antivirus, cloud en cours
+                # de synchro, droits) : les données sont probablement intactes —
+                # on REFUSE d'ouvrir plutôt que de repartir à vide (une
+                # sauvegarde ultérieure écraserait l'arbre par une base vide).
+                raise OSError(
+                    "Le fichier de l'arbre est momentanément inaccessible "
+                    "(%s). Ouverture refusée pour protéger vos données — "
+                    "réessayez dans un instant. Détail : %s" % (self.chemin, e))
+            except ValueError as e:
                 # JSON corrompu : on le met de côté, on ne le perd jamais, et on
                 # repart sur une base vide (aucune sauvegarde ne l'écrasera avant
                 # une action explicite).
                 self._mettre_de_cote_corrompu(e)
                 self.donnees = modele.base_vide()
+                self.avertissement = "corrompu"
+        self.version += 1
         modele.garantir_cles(self.donnees)
         # Migration douce : dates au format interne français (« 20 JUL 1984 » →
         # « 20/07/1984 »). Idempotent — un arbre déjà en français ne bouge pas.
@@ -70,10 +88,15 @@ class Base:
 
     @_synchronise
     def sauvegarder(self, horodatee=True, forcer_horodatage=False):
+        self.version += 1                # invalide les caches de lecture
         os.makedirs(os.path.dirname(self.chemin), exist_ok=True)
         tmp = self.chemin + ".tmp"                      # écriture atomique
+        # Fichier principal COMPACT (sans indent) : lu par la machine seulement,
+        # ~2× plus petit et plus rapide à (ré)écrire sur un gros arbre.
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(self.donnees, f, ensure_ascii=False, indent=2)
+            json.dump(self.donnees, f, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())         # vraiment sur le disque avant replace
         os.replace(tmp, self.chemin)
         # Copie horodatée dans Sauvegardes/, mais PAS à chaque micro-édition :
         # sur un gros arbre, archiver l'intégralité du JSON à chaque clic use le
@@ -82,8 +105,16 @@ class Base:
             os.makedirs(self.dossier_sauvegardes, exist_ok=True)
             cible = os.path.join(self.dossier_sauvegardes,
                                  "arboriane_%s.json" % horodatage())
+            n = 2
+            while os.path.exists(cible):     # deux archives la même seconde
+                cible = os.path.join(self.dossier_sauvegardes,
+                                     "arboriane_%s (%d).json" % (horodatage(), n))
+                n += 1
             try:
-                shutil.copy2(self.chemin, cible)
+                # Les archives RESTENT indentées : elles sont là pour être
+                # ouvertes et lues à la main en cas de pépin.
+                with open(cible, "w", encoding="utf-8") as fa:
+                    json.dump(self.donnees, fa, ensure_ascii=False, indent=2)
                 self._purger_sauvegardes(garder=30)
             except OSError:
                 pass
@@ -99,32 +130,84 @@ class Base:
             return False
         return bool(recents) and (time.time() - max(recents)) < intervalle
 
-    def _purger_sauvegardes(self, garder=30):
+    def _purger_sauvegardes(self, garder=30, plafond_corrompus=5):
+        """Rétention GÉNÉRATIONNELLE : les `garder` archives les plus récentes
+        + la PREMIÈRE archive de chacun des `garder` derniers jours (un point de
+        restauration quotidien survit donc aux rafales d'éditions d'une même
+        journée). Les copies CORROMPU_* sont plafonnées à `plafond_corrompus`."""
         try:
             fichiers = sorted(
                 (os.path.join(self.dossier_sauvegardes, n)
                  for n in os.listdir(self.dossier_sauvegardes)
                  if n.startswith("arboriane_") and n.endswith(".json")),
                 key=os.path.getmtime)
-            for vieux in fichiers[:-garder]:
+            a_garder = set(fichiers[-garder:])
+            maintenant = time.time()
+            premiere_du_jour = {}
+            for f in fichiers:                        # du plus ancien au plus récent
+                mt = os.path.getmtime(f)
+                if (maintenant - mt) > garder * 86400:
+                    continue                          # au-delà des N derniers jours
+                jour = time.strftime("%Y-%m-%d", time.localtime(mt))
+                premiere_du_jour.setdefault(jour, f)  # la 1re archive du jour
+            a_garder.update(premiere_du_jour.values())
+            for vieux in fichiers:
+                if vieux not in a_garder:
+                    os.remove(vieux)
+            corrompus = sorted(
+                (os.path.join(self.dossier_sauvegardes, n)
+                 for n in os.listdir(self.dossier_sauvegardes)
+                 if n.startswith("CORROMPU_") and n.endswith(".json")),
+                key=os.path.getmtime)
+            for vieux in corrompus[:-plafond_corrompus]:
                 os.remove(vieux)
         except OSError:
             pass
 
     @_synchronise
     def remplacer(self, donnees):
-        """Remplace toute la base (import GEDCOM/ZIP)."""
+        """Remplace toute la base (import GEDCOM/ZIP, restauration d'archive)."""
         modele.garantir_cles(donnees)
         self.donnees = donnees
+        # L'avertissement « corrompu » signale une base repartie à vide après
+        # quarantaine : un remplacement VOLONTAIRE (restauration, import) la
+        # remet d'aplomb — le bandeau ne doit pas survivre à la réparation.
+        self.avertissement = ""
         # Réaligne fams/famc sur la table des familles : purge les pointeurs
         # pendants et corrige les GEDCOM asymétriques (union/enfant fantômes).
         self._recalc_tous_liens()
+        # Ancre les compteurs monotones sur les ids importés : sans cela,
+        # supprimer le plus grand id d'un import puis créer quelqu'un le
+        # RECYCLAIT (références orphelines héritées, corbeille ambiguë).
+        self._ancrer_compteurs()
         self.sauvegarder()
+
+    def _ancrer_compteurs(self):
+        """meta.compteurs >= plus grand numéro présent, pour chaque table à
+        identifiants monotones. Défensif : tolère un meta/compteurs malformé."""
+        meta = self.donnees.get("meta")
+        if not isinstance(meta, dict):
+            meta = {}
+            self.donnees["meta"] = meta
+        compteurs = meta.get("compteurs")
+        if not isinstance(compteurs, dict):
+            compteurs = {}
+            meta["compteurs"] = compteurs
+        for table, prefixe in (("individus", "I"), ("familles", "F"),
+                               ("sources", "S"), ("ensembles", "E")):
+            plus_grand = modele._plus_grand_numero(
+                self.donnees.get(table) or {}, prefixe)
+            try:
+                actuel = int(compteurs.get(prefixe, 0) or 0)
+            except (TypeError, ValueError):
+                actuel = 0
+            if plus_grand > actuel:
+                compteurs[prefixe] = plus_grand
 
     # ── Individus ─────────────────────────────────────────────────────
     @_synchronise
     def creer_individu(self, champs):
-        ident = modele.nouvel_id(self.donnees["individus"], "I")
+        ident = modele.nouvel_id_monotone(self.donnees, "individus", "I")
         ind = {
             "id": ident,
             "sexe": champs.get("sexe", "U"),
@@ -241,10 +324,132 @@ class Base:
         self.sauvegarder()
         return ind
 
+    # ── Corbeille : suppression de personne RÉVERSIBLE (UX-03) ────────
+    # Avant chaque suppression, un instantané JSON (fiche complète + liens
+    # familiaux + favoris/ensembles) est déposé dans <arbre>/Corbeille/.
+    # « Annuler » recrée la personne SOUS SON ID D'ORIGINE (jamais recyclé,
+    # compteurs monotones) et retisse ses liens dans les familles survivantes.
+    @property
+    def dossier_corbeille(self):
+        return os.path.join(os.path.dirname(self.chemin), "Corbeille")
+
+    def _fichiers_corbeille(self):
+        """Instantanés présents, du plus ancien au plus récent (mtime puis nom,
+        pour rester déterministe si deux suppressions tombent la même seconde)."""
+        try:
+            return sorted(
+                (os.path.join(self.dossier_corbeille, n)
+                 for n in os.listdir(self.dossier_corbeille)
+                 if n.startswith("personne_") and n.endswith(".json")),
+                key=lambda p: (os.path.getmtime(p), p))
+        except OSError:
+            return []
+
+    def _deposer_corbeille(self, ident):
+        """Dépose l'instantané d'une personne AVANT sa suppression : fiche
+        complète, liens familiaux (famille + rôle + place), favori et
+        ensembles. Garde les 20 derniers. Une erreur d'écriture ne bloque
+        jamais la suppression (la corbeille est un filet, pas un verrou)."""
+        ind = self.donnees["individus"].get(ident)
+        if not ind:
+            return
+        liens = []
+        for fid, fam in self.donnees["familles"].items():
+            if fam.get("mari") == ident:
+                liens.append({"famille": fid, "role": "mari"})
+            if fam.get("epouse") == ident:
+                liens.append({"famille": fid, "role": "epouse"})
+            enfants = fam.get("enfants") or []
+            if ident in enfants:
+                liens.append({"famille": fid, "role": "enfant",
+                              "place": enfants.index(ident)})
+        favoris = self.donnees.get("favoris")
+        favori = favoris.get(ident) if isinstance(favoris, dict) else None
+        ensembles = [eid for eid, ens in (self.donnees.get("ensembles") or {}).items()
+                     if isinstance(ens, dict) and ident in (ens.get("membres") or [])]
+        instantane = {
+            "quoi": "personne_supprimee",
+            "quand": horodatage(),
+            "individu": copy.deepcopy(ind),
+            "liens": liens,
+            "favori": favori,
+            "ensembles": ensembles,
+        }
+        try:
+            os.makedirs(self.dossier_corbeille, exist_ok=True)
+            cible = os.path.join(self.dossier_corbeille,
+                                 "personne_%s_%s.json" % (ident, horodatage()))
+            with open(cible, "w", encoding="utf-8") as f:
+                json.dump(instantane, f, ensure_ascii=False, indent=2)
+            for vieux in self._fichiers_corbeille()[:-20]:   # garder les 20 derniers
+                os.remove(vieux)
+        except OSError:
+            pass
+
+    @_synchronise
+    def restaurer_dernier_supprime(self):
+        """Restaure la DERNIÈRE personne supprimée (instantané le plus récent
+        de Corbeille/) : recrée la fiche sous son id d'origine et retisse ses
+        liens — dans les familles qui existent ENCORE seulement, sans jamais
+        déloger un conjoint arrivé entre-temps. Renvoie l'individu restauré,
+        ou None (corbeille vide, instantané illisible, id déjà repris)."""
+        fichiers = self._fichiers_corbeille()
+        if not fichiers:
+            return None
+        dernier = fichiers[-1]
+        try:
+            with open(dernier, "r", encoding="utf-8") as f:
+                instantane = json.load(f)
+        except (OSError, ValueError):
+            return None
+        ind = instantane.get("individu")
+        if not isinstance(ind, dict) or not ind.get("id"):
+            return None
+        ident = ind["id"]
+        if ident in self.donnees["individus"]:
+            return None                       # id déjà occupé : on ne fusionne pas
+        ind["fams"], ind["famc"] = [], []     # re-dérivés depuis les familles
+        self.donnees["individus"][ident] = ind
+        fams = self.donnees["familles"]
+        for lien in instantane.get("liens") or []:
+            fam = fams.get((lien or {}).get("famille"))
+            if not fam:
+                continue                      # la famille a disparu entre-temps
+            role = lien.get("role")
+            if role in ("mari", "epouse"):
+                if not fam.get(role):         # créneau libre seulement
+                    fam[role] = ident
+            elif role == "enfant":
+                enfants = fam.setdefault("enfants", [])
+                if ident not in enfants:
+                    place = lien.get("place")
+                    if isinstance(place, int) and 0 <= place <= len(enfants):
+                        enfants.insert(place, ident)
+                    else:
+                        enfants.append(ident)
+        if instantane.get("favori") is not None:
+            favoris = self.donnees.setdefault("favoris", {})
+            if isinstance(favoris, dict):
+                favoris[ident] = instantane["favori"]
+        for eid in instantane.get("ensembles") or []:
+            ens = (self.donnees.get("ensembles") or {}).get(eid)
+            if isinstance(ens, dict):
+                membres = ens.setdefault("membres", [])
+                if ident not in membres:
+                    membres.append(ident)
+        self._recalc_tous_liens()
+        self.sauvegarder()
+        try:
+            os.remove(dernier)                # l'annulation est consommée
+        except OSError:
+            pass
+        return ind
+
     @_synchronise
     def supprimer_individu(self, ident):
         if ident not in self.donnees["individus"]:
             return False
+        self._deposer_corbeille(ident)        # filet : suppression annulable
         for fam in self.donnees["familles"].values():
             if fam.get("mari") == ident:
                 fam["mari"] = ""
@@ -258,6 +463,20 @@ class Base:
         for src in self.donnees.get("sources", {}).values():
             if src.get("personnes"):
                 src["personnes"] = [p for p in src["personnes"] if p.get("id") != ident]
+        # Cascade complète : favoris, ensembles et associations (parrain/témoin)
+        # de TOUS les individus — sinon un futur individu recevant un id recyclé
+        # hériterait de ces références, et les listes afficheraient des fantômes.
+        favoris = self.donnees.get("favoris")
+        if isinstance(favoris, dict):
+            favoris.pop(ident, None)
+        for ens in (self.donnees.get("ensembles") or {}).values():
+            if isinstance(ens, dict) and ident in (ens.get("membres") or []):
+                ens["membres"] = [m for m in ens["membres"] if m != ident]
+        for autre in self.donnees["individus"].values():
+            assos = autre.get("associations")
+            if assos and any(isinstance(a, dict) and a.get("id") == ident for a in assos):
+                autre["associations"] = [a for a in assos
+                                         if not (isinstance(a, dict) and a.get("id") == ident)]
         del self.donnees["individus"][ident]
         self._nettoyer_familles_vides()
         self.sauvegarder()
@@ -291,7 +510,7 @@ class Base:
                                 else fam.get("mari"))
                     if not coparent:
                         return fam
-        fid = modele.nouvel_id(fams, "F")
+        fid = modele.nouvel_id_monotone(self.donnees, "familles", "F")
         fam = {"id": fid, "mari": "", "epouse": "", "enfants": [],
                "mariage": {"date": "", "lieu": ""}, "note": ""}
         fams[fid] = fam
@@ -365,7 +584,7 @@ class Base:
                         fam = f
                         break
         if fam is None:                                 # 3) nouvelle famille
-            fid = modele.nouvel_id(fams, "F")
+            fid = modele.nouvel_id_monotone(self.donnees, "familles", "F")
             fam = {"id": fid, "mari": "", "epouse": "", "enfants": [],
                    "mariage": {"date": "", "lieu": ""}, "note": ""}
             fams[fid] = fam
@@ -388,7 +607,7 @@ class Base:
             return None
         if nouvelle:
             fams = self.donnees["familles"]
-            fid = modele.nouvel_id(fams, "F")
+            fid = modele.nouvel_id_monotone(self.donnees, "familles", "F")
             fam = {"id": fid, "mari": "", "epouse": "", "enfants": [],
                    "mariage": {"date": "", "lieu": ""}, "note": ""}
             fams[fid] = fam
@@ -424,7 +643,7 @@ class Base:
         fam = next((f for f in self.donnees["familles"].values()
                     if pid in f.get("enfants", [])), None)
         if fam is None:
-            fid = modele.nouvel_id(self.donnees["familles"], "F")
+            fid = modele.nouvel_id_monotone(self.donnees, "familles", "F")
             fam = {"id": fid, "mari": "", "epouse": "", "enfants": [pid],
                    "mariage": {"date": "", "lieu": ""}, "note": ""}
             self.donnees["familles"][fid] = fam
@@ -506,13 +725,47 @@ class Base:
         "transcription", "fichier", "fichiers", "personnes",
     )
 
+    # Champs de source qui DOIVENT rester des listes (même motif que
+    # _assainir_champ_individu : `.forEach`/`.map` côté écran Actes).
+    _CHAMPS_SOURCE_LISTE = frozenset(("fichiers", "personnes"))
+
+    @classmethod
+    def _assainir_champ_source(cls, cle, valeur):
+        """Contraint chaque champ de source à son type attendu : une écriture
+        malformée ne doit jamais casser la fiche, l'écran Actes ni l'export."""
+        if cle in cls._CHAMPS_SOURCE_LISTE:
+            if not isinstance(valeur, list):
+                return []
+            # Les ITEMS aussi doivent être sains (contrôle post-correction :
+            # un item non conforme recassait fiche/Actes/export — TECH-01 bis).
+            if cle == "personnes":
+                # tags de personnes : dicts {id:str, role:str} uniquement
+                props = []
+                for it in valeur:
+                    if isinstance(it, dict) and isinstance(it.get("id"), str) and it.get("id"):
+                        props.append({"id": it["id"][:64],
+                                      "role": str(it.get("role", ""))[:200]})
+                    elif isinstance(it, str) and it:      # tolérance : id nu
+                        props.append({"id": it[:64], "role": ""})
+                return props
+            # fichiers : chaînes non vides bornées
+            return [str(it)[:500] for it in valeur
+                    if isinstance(it, (str, int, float)) and str(it).strip()]
+        # champs texte : forcer en chaîne et borner (transcription et note
+        # peuvent être longues, le reste non).
+        maxi = 100000 if cle == "transcription" else (20000 if cle == "note" else 2000)
+        if valeur is None:
+            return ""
+        return (valeur if isinstance(valeur, str) else str(valeur))[:maxi]
+
     @_synchronise
     def creer_source(self, champs):
         self.donnees.setdefault("sources", {})
-        sid = modele.nouvel_id(self.donnees["sources"], "S")
+        sid = modele.nouvel_id_monotone(self.donnees, "sources", "S")
         src = {"id": sid}
         for cle in self.CHAMPS_SOURCE:
-            src[cle] = champs.get(cle, [] if cle in ("fichiers", "personnes") else "")
+            defaut = [] if cle in self._CHAMPS_SOURCE_LISTE else ""
+            src[cle] = self._assainir_champ_source(cle, champs.get(cle, defaut))
         self.donnees["sources"][sid] = src
         self.sauvegarder()
         return src
@@ -524,7 +777,7 @@ class Base:
             return None
         for cle in self.CHAMPS_SOURCE:
             if cle in champs:
-                src[cle] = champs[cle]
+                src[cle] = self._assainir_champ_source(cle, champs[cle])
         self.sauvegarder()
         return src
 
@@ -559,6 +812,41 @@ class Base:
         self.sauvegarder()
         return True
 
+    @staticmethod
+    def _normaliser_citation(citation):
+        """Force une citation au format canonique {source:str, page:str bornée,
+        quay:int 0-3 ou None, role:str} — une citation malformée (types
+        hostiles) ne doit jamais casser fiche, écran Actes ni export GEDCOM.
+        NB : « pas de niveau » = None (jamais "") — l'export GEDCOM écrit QUAY
+        dès que la valeur n'est pas None, et l'import (champs.py) pose None."""
+        c = citation if isinstance(citation, dict) else {}
+        src = c.get("source")
+        page = c.get("page")
+        role = c.get("role")
+        quay = c.get("quay")
+        if isinstance(quay, bool):        # True/False ne sont pas des niveaux QUAY
+            quay = None
+        try:
+            quay = min(3, max(0, int(quay)))
+        except (TypeError, ValueError):
+            quay = None                   # absent ou non numérique : pas de niveau
+        return {
+            "source": (src if isinstance(src, str) else str(src or ""))[:100],
+            "page": (page if isinstance(page, str) else str(page or ""))[:2000],
+            "quay": quay,
+            "role": (role if isinstance(role, str) else str(role or ""))[:200],
+        }
+
+    def _fam_visee(self, ind, pid, famille):
+        """Famille visée par une preuve d'union : `famille` si pid en est bien
+        un parent (cas remariage), sinon sa première union, sinon None."""
+        if famille and famille in self.donnees["familles"]:
+            cand = self.donnees["familles"][famille]
+            if pid in (cand.get("mari"), cand.get("epouse")):
+                return cand
+        fams = ind.get("fams") or []
+        return self.donnees["familles"].get(fams[0]) if fams else None
+
     @_synchronise
     def citer(self, pid, fait, citation, famille=None):
         """Attache une citation (preuve) à un fait d'une personne.
@@ -567,6 +855,7 @@ class Base:
         'union_evenement:index', ou l'index nu d'un événement individuel.
         `famille` (facultatif) cible l'union PRÉCISE à prouver (sinon
         la 1re) — utile en cas de remariage. `citation` = {source, page, quay, role}."""
+        citation = self._normaliser_citation(citation)
         ind = self.donnees["individus"].get(pid)
         if not ind:
             return None
@@ -579,14 +868,7 @@ class Base:
             # L'union est portée par la FAMILLE (mariage), pas par l'individu — la
             # citation est donc PARTAGÉE par les deux conjoints. On cible l'union
             # demandée (`famille`) si pid en est bien un parent, sinon sa 1re.
-            fam = None
-            if famille and famille in self.donnees["familles"]:
-                cand = self.donnees["familles"][famille]
-                if pid in (cand.get("mari"), cand.get("epouse")):
-                    fam = cand
-            if fam is None:
-                fams = ind.get("fams") or []
-                fam = self.donnees["familles"].get(fams[0]) if fams else None
+            fam = self._fam_visee(ind, pid, famille)
             if not fam:
                 return None
             mar = fam.setdefault("mariage", {"date": "", "lieu": ""})
@@ -596,14 +878,7 @@ class Base:
             # SEPR…) : comme le mariage, il est PARTAGÉ par les deux conjoints. On
             # cible l'union demandée (`famille`) si pid en est parent, sinon la 1re.
             idx = str(fait).split(":", 1)[1]
-            fam = None
-            if famille and famille in self.donnees["familles"]:
-                cand = self.donnees["familles"][famille]
-                if pid in (cand.get("mari"), cand.get("epouse")):
-                    fam = cand
-            if fam is None:
-                fams = ind.get("fams") or []
-                fam = self.donnees["familles"].get(fams[0]) if fams else None
+            fam = self._fam_visee(ind, pid, famille)
             evts = (fam or {}).get("evenements") or []
             if not fam or not idx.isdigit() or not (0 <= int(idx) < len(evts)) \
                     or not isinstance(evts[int(idx)], dict):
@@ -629,6 +904,67 @@ class Base:
                 return None
         self.sauvegarder()
         return ind
+
+    def _citations_du_fait(self, pid, fait, famille=None):
+        """Liste VIVANTE des citations du fait visé — même aiguillage que
+        citer(). None si personne/fait introuvable ou sans citations.
+        Lecture seule : ne crée jamais la liste manquante."""
+        ind = self.donnees["individus"].get(pid)
+        if not ind:
+            return None
+        fait = str(fait)
+        if fait == "personne":
+            cible = ind
+        elif fait in ("naissance", "deces"):
+            cible = ind.get(fait)
+        elif fait == "union":
+            fam = self._fam_visee(ind, pid, famille)
+            cible = (fam or {}).get("mariage")
+        elif fait.startswith("union_evenement:"):
+            idx = fait.split(":", 1)[1]
+            evts = (self._fam_visee(ind, pid, famille) or {}).get("evenements") or []
+            cible = (evts[int(idx)]
+                     if idx.isdigit() and int(idx) < len(evts) else None)
+        elif ":" in fait:
+            _CLE = {"residence": "residences", "profession": "professions",
+                    "evenement": "evenements"}
+            nom, _, idx = fait.partition(":")
+            liste = ind.get(_CLE.get(nom) or "") or []
+            cible = (liste[int(idx)]
+                     if idx.isdigit() and int(idx) < len(liste) else None)
+        else:
+            try:
+                cible = (ind.get("evenements") or [])[int(fait)]
+            except (ValueError, IndexError):
+                cible = None
+        if not isinstance(cible, dict):
+            return None
+        cits = cible.get("citations")
+        return cits if isinstance(cits, list) else None
+
+    @_synchronise
+    def citations_de(self, pid, fait, famille=None):
+        """COPIE des citations attachées à un fait ([] si aucune) — pour les
+        afficher (dépliage « Preuves par fait ») sans exposer la liste vivante."""
+        liste = self._citations_du_fait(pid, fait, famille)
+        return [dict(c) for c in (liste or []) if isinstance(c, dict)]
+
+    @_synchronise
+    def retirer_citation(self, pid, fait, index, famille=None):
+        """Retire la citation n° `index` du fait visé (même aiguillage que
+        citer() — vaut donc aussi pour l'union et les faits du couple, via
+        `famille`). La source elle-même n'est jamais touchée. Renvoie
+        l'individu si le retrait a eu lieu, None sinon."""
+        try:
+            index = int(index)
+        except (TypeError, ValueError):
+            return None
+        liste = self._citations_du_fait(pid, fait, famille)
+        if liste is None or not (0 <= index < len(liste)):
+            return None
+        del liste[index]
+        self.sauvegarder()
+        return self.donnees["individus"].get(pid)
 
     @_synchronise
     def taguer_personne_source(self, sid, pid, role=""):

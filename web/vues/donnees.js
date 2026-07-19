@@ -39,7 +39,7 @@ export async function vueDonnees(vue) {
       try {
         const r = await apiJson("/api/espaces/sauvegarde", "POST", {});
         toast("Sauvegarde créée : " + r.fichier);
-      } catch (e) { toast(e.message); }
+      } catch (e) { toast(e.message, { type: "erreur" }); }
     } }, "Créer une sauvegarde complète")));
 
   // 2) Export GEDCOM
@@ -53,7 +53,7 @@ export async function vueDonnees(vue) {
         const r = await apiGet("/api/export/gedcom");
         telechargerTexte((esp.nom || "arbre") + ".ged", r.texte);
         toast("GEDCOM exporté (aussi enregistré dans Exports/).");
-      } catch (e) { toast(e.message); }
+      } catch (e) { toast(e.message, { type: "erreur" }); }
     } }, "Télécharger le GEDCOM")));
 
   // 2a-bis) Export d'un rameau (ascendance / descendance d'une personne)
@@ -79,7 +79,7 @@ export async function vueDonnees(vue) {
               { personne: pick.valeur(), sens: selSens.value });
             telechargerTexte(r.fichier || "rameau.ged", r.texte);
             toast("Rameau exporté (aussi dans Exports/).");
-          } catch (e) { toast(e.message); }
+          } catch (e) { toast(e.message, { type: "erreur" }); }
         } }, "Exporter le rameau"))));
   }
 
@@ -93,7 +93,7 @@ export async function vueDonnees(vue) {
       try {
         const r = await apiJson("/api/export/gedzip", "POST", {});
         toast("GEDZIP créé : " + r.fichier);
-      } catch (e) { toast(e.message); }
+      } catch (e) { toast(e.message, { type: "erreur" }); }
     } }, "Créer un GEDZIP")));
 
   // 2c) Publication en ligne (vivants masqués)
@@ -120,7 +120,7 @@ export async function vueDonnees(vue) {
         try {
           const r = await apiJson("/api/publication/gedcom", "POST", {});
           toast("GEDCOM public créé : " + r.fichier);
-        } catch (e) { toast(e.message); }
+        } catch (e) { toast(e.message, { type: "erreur" }); }
       } }, "Exporter le GEDCOM public")),
     zonePub));
 
@@ -241,7 +241,7 @@ export async function vueDonnees(vue) {
                         + "récentes peuvent manquer." : ""),
                 (g7 || (r.scans && r.scans.manquants)) ? { duree: 12000 } : undefined);
           input.value = ""; vider(zoneImport); aller("accueil");
-        } catch (e) { toast(e.message); }
+        } catch (e) { toast(e.message, { type: "erreur" }); }
       }, title: "Ajoute et complète sans rien supprimer" }, "🔗 Fusionner (recommandé)"),
       h("button", { class: "bouton secondaire danger", onclick: async () => {
         if (!await confirmer(
@@ -256,7 +256,7 @@ export async function vueDonnees(vue) {
           const bilan = bilanImport(r);
           toast(bilan.texte, bilan.alerte ? { duree: 12000 } : undefined);
           input.value = ""; vider(zoneImport); aller("accueil");
-        } catch (e) { toast(e.message); }
+        } catch (e) { toast(e.message, { type: "erreur" }); }
       }, title: "Écrase l'arbre actuel" }, "Remplacer tout l'arbre"),
       h("button", { class: "bouton fantome", onclick: () => { input.value = ""; vider(zoneImport); } },
         "Annuler")));

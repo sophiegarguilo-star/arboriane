@@ -140,6 +140,13 @@ def lire_indi(rec):
             fid = _pointeur(enf["valeur"])
             if fid:
                 ind["famc"].append(fid)
+                # Type de filiation (2 PEDI adopted/foster/birth, 2 STAT
+                # challenged). Porté par l'INDI dans le fichier, mais stocké
+                # côté FAMILLE par Arboriane : transporté dans ind["_pedi"]
+                # (champ temporaire, reversé dans fam["pedi"] par importer).
+                typ = _type_filiation(enf)
+                if typ:
+                    ind.setdefault("_pedi", {})[fid] = typ
         elif tag == "FAMS":
             fid = _pointeur(enf["valeur"])
             if fid:
@@ -155,6 +162,36 @@ def lire_indi(rec):
     if cites:
         ind["citations"] = cites
     return ind
+
+
+def _type_filiation(famc):
+    """Type de filiation FRANÇAIS d'un noeud FAMC : « adoption », « accueil »,
+    « probable », ou « » (naissance — le défaut, jamais stocké).
+
+    PEDI adopted/foster -> adoption/accueil ; STAT challenged (lien ni prouvé ni
+    réfuté) -> « probable » quand PEDI ne dit rien de plus fort. PEDI birth ou
+    sealing, ou l'absence de PEDI : naissance (« »)."""
+    pedi = _premier(famc, "PEDI")
+    v = _fusion_texte(pedi).strip().lower() if pedi else ""
+    typ = PEDI_VERS_FR.get(v, "")
+    stat = _premier(famc, "STAT")
+    if not typ and stat and "challenged" in _fusion_texte(stat).strip().lower():
+        typ = "probable"
+    return typ
+
+
+def _type_filiation_frel(chil):
+    """Type de filiation depuis les tags privés _FREL/_MREL (FTM, PAF) portés
+    par le CHIL d'un FAM : « adopted »/« foster »/« guardian » -> type français.
+    « natural »/« step »/inconnu : « » (pas de type posé)."""
+    for tg in ("_FREL", "_MREL"):
+        n = _premier(chil, tg)
+        v = _fusion_texte(n).strip().lower() if n else ""
+        if v.startswith("adopt"):
+            return "adoption"
+        if v in ("foster", "guardian"):
+            return "accueil"
+    return ""
 
 
 def lire_fam(rec):
@@ -179,6 +216,11 @@ def lire_fam(rec):
             cid = _pointeur(enf["valeur"])
             if cid:
                 fam["enfants"].append(cid)
+                # _FREL/_MREL (FTM/PAF) : type de filiation porté par le CHIL.
+                # Le PEDI de l'INDI, plus standard, aura le dernier mot.
+                typ = _type_filiation_frel(enf)
+                if typ:
+                    fam.setdefault("pedi", {})[cid] = typ
         elif tag == "MARR":
             # Un couple = un mariage principal. Un 2e MARR (ex. saisi par
             # erreur/test sur un site) est gardé comme événement, sans

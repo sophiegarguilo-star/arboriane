@@ -1,6 +1,6 @@
 // Onglet « Listes & index » (Lot 8) — index des métiers, unions, ascendance /
 // descendance textuelles, éphéméride. Chaque liste s'exporte en CSV (côté client).
-import { h, vider } from "../noyau/dom.js";
+import { h, vider, actionnable } from "../noyau/dom.js";
 import { aller } from "../noyau/etat.js";
 import { apiGet } from "../noyau/api.js";
 import { badge } from "../composants/badge.js";
@@ -36,8 +36,8 @@ function carteMetiers(m) {
     const det = h("details", {}, h("summary", {}, h("strong", {}, x.metier), " ", badge(String(x.nb))));
     const box = h("div", { class: "liste-pers compacte" });
     x.personnes.forEach((p) => box.append(
-      h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: p.id }) },
-        h("strong", {}, p.nom), p.periode ? h("span", { class: "meta" }, p.periode) : null)));
+      actionnable(h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: p.id }) },
+        h("strong", {}, p.nom), p.periode ? h("span", { class: "meta" }, p.periode) : null))));
     det.append(box); c.append(det);
   });
   return c;
@@ -71,9 +71,9 @@ function carteLignee(titre, url, champ) {
         r.lignes.map((l) => [String(l[champ]), l.nom, l.periode])));
       const box = h("div", { class: "liste-pers compacte liste-defilante" });
       r.lignes.forEach((l) => box.append(
-        h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: l.id }) },
+        actionnable(h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: l.id }) },
           h("strong", { class: "pers-num" }, String(l[champ])),
-          h("span", { class: "meta" }, l.nom + (l.periode ? " · " + l.periode : "")))));
+          h("span", { class: "meta" }, l.nom + (l.periode ? " · " + l.periode : ""))))));
       zone.append(box);
     } catch (e) { vider(zone); zone.append(h("div", { class: "vide compacte" }, e.message)); }
     btn.disabled = false;
@@ -92,9 +92,9 @@ function carteEphemeride(e) {
     e.personnes.map((p) => [String(p.jour), p.mois_nom, p.nom, String(p.annee || "")])));
   const box = h("div", { class: "liste-pers compacte liste-defilante" });
   e.personnes.forEach((p) => box.append(
-    h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: p.id }) },
+    actionnable(h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: p.id }) },
       h("strong", {}, p.jour + " " + p.mois_nom),
-      h("span", { class: "meta" }, p.nom + (p.annee ? " (" + p.annee + ")" : "")))));
+      h("span", { class: "meta" }, p.nom + (p.annee ? " (" + p.annee + ")" : ""))))));
   c.append(box); return c;
 }
 

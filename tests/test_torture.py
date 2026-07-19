@@ -287,6 +287,110 @@ def test_coherence_hors_famille():
             {"O", "Q"} <= isolees2)
 
 
+# ── 6e. IDs jamais réutilisés (compteurs monotones persistés) ─────────────
+def test_ids_monotones():
+    from core import espace as espace_mod, stockage
+    app = Application(tempfile.mkdtemp())
+    app.creer("Ids")
+    base = app.base
+    i1 = base.creer_individu({"nom": "UN"})["id"]
+    verifie("ids : premier individu = I1", i1 == "I1")
+    base.supprimer_individu(i1)
+    i2 = base.creer_individu({"nom": "DEUX"})["id"]
+    verifie("ids : I1 supprimé n'est JAMAIS réattribué", i2 == "I2")
+    s1 = base.creer_source({"titre": "A"})["id"]
+    base.supprimer_source(s1)
+    s2 = base.creer_source({"titre": "B"})["id"]
+    verifie("ids : source supprimée jamais réattribuée", s2 != s1)
+    # familles : une union supprimée (devenue sans objet) ne réattribue pas son id
+    a = base.creer_individu({"nom": "A", "sexe": "M"})["id"]
+    b = base.creer_individu({"nom": "B", "sexe": "F"})["id"]
+    f1 = base.ajouter_conjoint(a, b)["id"]
+    base.supprimer_individu(b)                       # famille sans objet -> purgée
+    verifie("ids : famille purgée après suppression du conjoint",
+            f1 not in base.donnees["familles"])
+    c = base.creer_individu({"nom": "C", "sexe": "F"})["id"]
+    f2 = base.ajouter_conjoint(a, c)["id"]
+    verifie("ids : famille supprimée jamais réattribuée", f2 != f1)
+    # persistance : le compteur survit à un rechargement depuis le disque
+    ch = espace_mod.chemins(app.espace_chemin)
+    base2 = stockage.Base(ch["base"], ch["sauvegardes"])
+    base2.supprimer_individu(i2)
+    i3 = base2.creer_individu({"nom": "TROIS"})["id"]
+    verifie("ids : compteur persisté (rechargement disque)", i3 not in (i1, i2))
+    # rétrocompatible : base SANS meta.compteurs -> repart du plus grand existant
+    d = {"individus": {"I7": {"id": "I7"}}, "familles": {}}
+    verifie("ids : sans compteur, max existant + 1",
+            modele.nouvel_id_monotone(d, "individus", "I") == "I8")
+
+
+# ── 6f. Cascade complète : favoris, ensembles, associations ──────────────
+def test_cascade_favoris_ensembles_associations():
+    from services import favoris as fav_svc
+    app = Application(tempfile.mkdtemp())
+    app.creer("Cascade")
+    base = app.base
+    cible = base.creer_individu({"nom": "CIBLE"})["id"]
+    autre = base.creer_individu({"nom": "AUTRE"})["id"]
+    fav_svc.basculer(base, cible)
+    eid = fav_svc.creer_ensemble(base, "Branche", [cible, autre])["id"]
+    base.modifier_individu(autre, {"associations": [
+        {"id": cible, "relation": "parrain"},
+        {"id": autre, "relation": "témoin"}]})
+    base.supprimer_individu(cible)
+    verifie("cascade : favori purgé", cible not in base.donnees["favoris"])
+    verifie("cascade : retiré des ensembles",
+            cible not in base.donnees["ensembles"][eid]["membres"])
+    assos = base.donnees["individus"][autre]["associations"]
+    verifie("cascade : association parrain/témoin purgée",
+            all(a.get("id") != cible for a in assos))
+    verifie("cascade : les autres associations survivent",
+            any(a.get("id") == autre for a in assos))
+    sans_planter("cascade : lister favoris après suppression",
+                 lambda: fav_svc.lister_favoris(base.donnees))
+
+
+# ── 6g. Source & citation malformées : assainies côté serveur ─────────────
+def test_source_et_citation_malformees():
+    app = Application(tempfile.mkdtemp())
+    app.creer("SrcHostile")
+    base = app.base
+    pid = base.creer_individu({"nom": "X"})["id"]
+    src = base.creer_source({"titre": {"a": 1}, "fichiers": "pas-une-liste",
+                             "personnes": 42, "note": None, "type": ["liste"]})
+    verifie("source : fichiers forcé en liste", isinstance(src["fichiers"], list))
+    verifie("source : personnes forcé en liste", isinstance(src["personnes"], list))
+    verifie("source : titre forcé en chaîne", isinstance(src["titre"], str))
+    verifie("source : note None -> chaîne vide", src["note"] == "")
+    base.modifier_source(src["id"], {"fichiers": {"x": 1}, "titre": 123,
+                                     "transcription": "T" * 200000})
+    s = base.donnees["sources"][src["id"]]
+    verifie("source : modifier garde fichiers en liste", isinstance(s["fichiers"], list))
+    verifie("source : titre non-chaîne neutralisé", isinstance(s["titre"], str))
+    verifie("source : transcription bornée", len(s["transcription"]) <= 100000)
+    # citation hostile : types invalides normalisés, jamais stockés bruts
+    base.citer(pid, "naissance", {"source": src["id"], "page": {"n": 1},
+                                  "quay": "haute", "role": None})
+    cit = base.donnees["individus"][pid]["naissance"]["citations"][-1]
+    verifie("citation : quay non numérique -> None", cit["quay"] is None)
+    verifie("citation : page forcée en chaîne", isinstance(cit["page"], str))
+    verifie("citation : role None -> chaîne", cit["role"] == "")
+    base.citer(pid, "personne", {"source": src["id"], "quay": 7})
+    verifie("citation : quay borné à 3",
+            base.donnees["individus"][pid]["citations"][-1]["quay"] == 3)
+    base.citer(pid, "personne", {"source": src["id"], "quay": -2})
+    verifie("citation : quay négatif borné à 0",
+            base.donnees["individus"][pid]["citations"][-1]["quay"] == 0)
+    sans_planter("citation : corps non-dict", lambda: base.citer(pid, "personne", "n'importe quoi"))
+    # fiche / écran Actes / export : rien ne casse après ces écritures
+    sans_planter("écran Actes après source hostile", lambda: sources.lister(base.donnees))
+    sans_planter("fiche source après source hostile",
+                 lambda: sources.fiche_source(base.donnees, src["id"]))
+    sans_planter("preuves après citation hostile",
+                 lambda: sources.preuves_personne(base.donnees, pid))
+    sans_planter("export GEDCOM après hostilité", lambda: ecriture.exporter(base.donnees))
+
+
 # ── 7. Racine incohérente ────────────────────────────────────────────────
 def test_racine_incoherente():
     donnees = {"individus": {"I1": {"id": "I1"}}, "familles": {}}
@@ -295,12 +399,59 @@ def test_racine_incoherente():
     verifie("catégories sans racine -> vide", _categories(donnees, {}) == {})
 
 
+def _app_temporaire():
+    import tempfile
+    from core.application import Application
+    app = Application(tempfile.mkdtemp())
+    app.creer("Torture-CTRL")
+    return app
+
+
+def test_items_de_listes_hostiles():
+    """Contrôle final 2026-07-19 : les ITEMS des listes fichiers/personnes d'une
+    source doivent être assainis aussi (un dict ou un entier glissé recassait
+    fiche, écran Actes et export — TECH-01 bis)."""
+    app = _app_temporaire(); base = app.base
+    pid = base.creer_individu({"nom": "Item", "prenoms": "Hostile"})["id"]
+    s = base.creer_source({"titre": "S", "fichiers": [{"x": 1}, "ok.jpg", None, 42],
+                           "personnes": [42, {"id": 7}, {"id": pid, "role": "témoin"}, "I999"]})
+    src = base.donnees["sources"][s["id"]]
+    verifie("fichiers : items non-chaîne écartés/convertis", src["fichiers"] == ["ok.jpg", "42"])
+    verifie("personnes : dicts {id:str} uniquement",
+            [p["id"] for p in src["personnes"]] == [pid, "I999"])
+    from services import sources as ssvc
+    ssvc.lister(base.donnees)                      # écran Actes : ne lève plus
+    from core import gedcom as ged
+    ged.exporter(base.donnees)                     # export : ne lève plus
+    verifie("liste + export servables après items hostiles", True)
+    # même hostilité en MODIFICATION
+    base.modifier_source(s["id"], {"personnes": [None, 3.14, {"role": "x"}]})
+    verifie("modification hostile → liste purgée",
+            base.donnees["sources"][s["id"]]["personnes"] == [])
+
+
+def test_export_sans_dossier_exports():
+    """Contrôle final 2026-07-19 : un .zip restauré peut ne pas contenir Exports/
+    — l'export doit recréer le dossier au lieu d'échouer avec un message trompeur."""
+    import shutil
+    app = _app_temporaire(); base = app.base
+    base.creer_individu({"nom": "Export", "prenoms": "Sans Dossier"})
+    exp = os.path.join(app.espace_chemin, "Exports")
+    shutil.rmtree(exp, ignore_errors=True)
+    from services import echange
+    chemin, texte = echange.exporter(app)
+    verifie("Exports/ recréé et fichier écrit", os.path.exists(chemin))
+    verifie("contenu GEDCOM présent", "0 HEAD" in texte)
+
+
 if __name__ == "__main__":
     for fn in (test_filiation_cyclique, test_champs_vides, test_categories_limites,
                test_unicode_et_longueur, test_pacs_bancals, test_suppression_cascade,
                test_ecriture_types_invalides, test_deces_pas_a_prouver_si_vivant,
                test_hors_famille_exclus_des_stats, test_coherence_hors_famille,
-               test_racine_incoherente):
+               test_ids_monotones, test_cascade_favoris_ensembles_associations,
+               test_source_et_citation_malformees, test_racine_incoherente,
+               test_items_de_listes_hostiles, test_export_sans_dossier_exports):
         print(fn.__name__)
         fn()
     print("\n%d ok, %d échec(s)" % (_ok, _ko))

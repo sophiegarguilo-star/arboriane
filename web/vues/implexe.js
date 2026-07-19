@@ -1,7 +1,7 @@
 // Onglet « Parenté avancée » (Lot 7) — implexe, consanguinité, Aboville,
 // Sosa permanent. Le grisage des branches dans l'arbre est un chantier distinct
 // (après découpage de arbre.py) — ici on ne fait que calculer et afficher.
-import { h, vider } from "../noyau/dom.js";
+import { h, vider, actionnable } from "../noyau/dom.js";
 import { aller } from "../noyau/etat.js";
 import { apiGet, apiJson } from "../noyau/api.js";
 import { badge } from "../composants/badge.js";
@@ -57,8 +57,8 @@ function carteImplexe(imp) {
       "Ancêtres à Sosa multiples (" + imp.ancetres_multiples.length + ")"));
     const box = h("div", { class: "liste-pers compacte" });
     imp.ancetres_multiples.forEach((m) => box.append(
-      h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: m.id }) },
-        h("strong", {}, m.nom), h("span", { class: "meta" }, "Sosa " + m.sosas.join(", ")))));
+      actionnable(h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: m.id }) },
+        h("strong", {}, m.nom), h("span", { class: "meta" }, "Sosa " + m.sosas.join(", "))))));
     det.append(box); c.append(det);
   } else {
     c.append(h("div", { class: "vide compacte" },
@@ -96,9 +96,9 @@ function carteConsang(inds) {
       if (r.consanguin) {
         const box = h("div", { class: "liste-pers compacte" });
         r.ancetres_communs.forEach((a) => box.append(
-          h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: a.id }) },
+          actionnable(h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: a.id }) },
             h("strong", {}, a.nom),
-            h("span", { class: "meta" }, "apport " + (a.contribution * 100).toFixed(3) + " %"))));
+            h("span", { class: "meta" }, "apport " + (a.contribution * 100).toFixed(3) + " %")))));
         res.append(h("p", { class: "sous-titre" }, r.nb_ancetres_communs + " ancêtre(s) commun(s) :"), box);
       } else {
         res.append(h("div", { class: "vide compacte" },
@@ -125,9 +125,9 @@ function carteAboville() {
         r.total + " personnes dans la descendance de " + r.racine_nom + "."));
       const box = h("div", { class: "liste-pers compacte liste-defilante" });
       r.personnes.forEach((p) => box.append(
-        h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: p.id }) },
+        actionnable(h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: p.id }) },
           h("strong", { style: "font-variant-numeric:tabular-nums" }, p.numero),
-          h("span", { class: "meta" }, p.nom + (p.periode ? " · " + p.periode : "")))));
+          h("span", { class: "meta" }, p.nom + (p.periode ? " · " + p.periode : ""))))));
       zone.append(box);
     } catch (e) { vider(zone); zone.append(h("p", { class: "message" }, e.message)); }
     btn.disabled = false;
@@ -150,7 +150,7 @@ function carteSosaPerm(sp) {
       const r = await apiJson("/api/sosa-permanent/figer", "POST", {});
       toast(r.numerotees + " personnes numérotées.");
       aller("implexe");
-    } catch (e) { toast(e.message); figer.disabled = false; }
+    } catch (e) { toast(e.message, { type: "erreur" }); figer.disabled = false; }
   };
   const eff = h("button", { class: "bouton secondaire" }, "Effacer");
   eff.onclick = async () => {
@@ -159,7 +159,7 @@ function carteSosaPerm(sp) {
       const r = await apiJson("/api/sosa-permanent/effacer", "POST", {});
       toast(r.effacees + " Sosa effacés.");
       aller("implexe");
-    } catch (e) { toast(e.message); eff.disabled = false; }
+    } catch (e) { toast(e.message, { type: "erreur" }); eff.disabled = false; }
   };
   c.append(etat, h("div", { class: "barre-actions" }, figer, eff));
   return c;

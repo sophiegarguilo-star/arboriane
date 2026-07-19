@@ -16,7 +16,13 @@ def _piste(categorie, priorite, pid, nom, quoi, pourquoi, ou=""):
             "personne_nom": nom, "quoi": quoi, "pourquoi": pourquoi, "ou": ou}
 
 
-def plan(donnees, racine_id=None, gen=12, pistes_carnet=None):
+# Plafond par défaut de pistes renvoyées PAR CATÉGORIE. Sans lui, un grand
+# arbre produisait 24 000 pistes (6,6 Mo de JSON, 155 000 nœuds DOM) : la page
+# gelait. Le total réel reste annoncé ; `limite=0` rend tout (export CSV).
+LIMITE_PISTES = 200
+
+
+def plan(donnees, racine_id=None, gen=12, pistes_carnet=None, limite=LIMITE_PISTES):
     inds = donnees["individus"]
     pistes = []
 
@@ -83,8 +89,13 @@ def plan(donnees, racine_id=None, gen=12, pistes_carnet=None):
     par_cat = {}
     for p in pistes:
         par_cat.setdefault(p["categorie"], []).append(p)
-    return {"total": len(pistes),
-            "categories": [{"nom": c, "pistes": ps} for c, ps in par_cat.items()]}
+    # Chaque catégorie annonce son total RÉEL mais ne transporte qu'au plus
+    # `limite` pistes (les plus prioritaires : la liste est déjà triée).
+    categories = []
+    for c, ps in par_cat.items():
+        categories.append({"nom": c, "total": len(ps),
+                           "pistes": ps[:limite] if limite else ps})
+    return {"total": len(pistes), "categories": categories}
 
 
 def _lieu_du_fait(ind, fait):

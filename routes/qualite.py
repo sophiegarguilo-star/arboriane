@@ -30,8 +30,17 @@ def plan(app, params, corps):
         gen = int(params.get("gen") or 12)
     except (TypeError, ValueError):
         gen = 12
+    # `limite` : plafond de pistes par catégorie (défaut 200) ; 0 = tout
+    # renvoyer (utilisé par l'export CSV, qui doit rester complet).
+    try:
+        limite = int(params["limite"]) if "limite" in params else recherche_svc.LIMITE_PISTES
+    except (TypeError, ValueError):
+        limite = recherche_svc.LIMITE_PISTES
+    if limite < 0:
+        limite = 0
     return recherche_svc.plan(d, racine, gen,
-                              carnet_svc.pistes_actives(app.espace_chemin))
+                              carnet_svc.pistes_actives(app.espace_chemin),
+                              limite=limite)
 
 
 # ── Carnet de bord ────────────────────────────────────────────────────

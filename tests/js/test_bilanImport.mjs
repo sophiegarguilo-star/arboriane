@@ -10,7 +10,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { bilanImport } = await import("../../web/composants/bilanImport.js");
+const { bilanImport, messageNonLues, resumeNonLues } =
+  await import("../../web/composants/bilanImport.js");
 
 test("import sain : message simple, pas d'alerte", () => {
   const b = bilanImport({ personnes: 297, familles: 148, sources: 2, liens: 440,
@@ -59,4 +60,50 @@ test("5.5.1 et 5.5.5 ne déclenchent aucune alerte de version", () => {
     const b = bilanImport({ personnes: 3, familles: 1, liens: 3, version_fichier: v });
     assert.equal(b.alerte, false, "version " + JSON.stringify(v));
   }
+});
+
+// ── PARC-11 : balises non reprises ────────────────────────────────────────
+
+test("resumeNonLues : tri par fréquence et total", () => {
+  const r = resumeNonLues({ BAPL: 2, AGE: 5, SLGC: 1 });
+  assert.equal(r.total, 8);
+  assert.deepEqual(r.entrees[0], ["AGE", 5]);
+});
+
+test("resumeNonLues : rien à dire -> null", () => {
+  assert.equal(resumeNonLues({}), null);
+  assert.equal(resumeNonLues(undefined), null);
+  assert.equal(resumeNonLues({ BAPL: 0 }), null);
+});
+
+test("messageNonLues : total, balises et conseil de garder le fichier", () => {
+  const m = messageNonLues({ BAPL: 2, AGE: 1 });
+  assert.match(m, /3 informations du fichier non reprises/);
+  assert.match(m, /BAPL ×2/);
+  assert.match(m, /Conservez votre fichier \.ged d'origine/);
+});
+
+test("messageNonLues : accord au singulier", () => {
+  const m = messageNonLues({ SLGC: 1 });
+  assert.match(m, /1 information du fichier non reprise /);
+  assert.match(m, /balise : SLGC ×1/);
+});
+
+test("bilanImport : non_lues apparaît dans le texte et allonge le toast", () => {
+  const b = bilanImport({ personnes: 5, familles: 2, liens: 6,
+                          non_lues: { BAPL: 2 } });
+  assert.equal(b.alerte, true);
+  assert.match(b.texte, /2 informations du fichier non reprises/);
+});
+
+test("bilanImport : sans non_lues, rien ne change", () => {
+  const b = bilanImport({ personnes: 5, familles: 2, liens: 6, non_lues: {} });
+  assert.equal(b.alerte, false);
+  assert.doesNotMatch(b.texte, /non reprise/);
+});
+
+test("bilanImport : hors navigateur, le dépliant est null (pas de plantage)", () => {
+  const b = bilanImport({ personnes: 5, familles: 2, liens: 6,
+                          non_lues: { BAPL: 1 } });
+  assert.equal(b.detail, null);
 });

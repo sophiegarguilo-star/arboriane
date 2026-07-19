@@ -9,6 +9,7 @@ en GEDCOM 5.5.1. Le fichier .ged est écrit dans le dossier Exports/ de l'espace
 actif. Bibliothèque standard uniquement (deepcopy).
 """
 
+import os
 import copy
 
 from core import gedcom, modele
@@ -147,6 +148,7 @@ def exporter_rameau(app, personne_id, sens="ascendance", generations=None):
     ind = donnees["individus"][personne_id]
     nom = nom_sur(modele.nom_complet(ind), "personne")
     c = chemins(app.espace_chemin)
+    os.makedirs(c["exports"], exist_ok=True)   # un .zip restauré peut ne pas contenir Exports/
     cible = dans(c["exports"], "%s_%s_%s.ged" % (nom, sens, horodatage()))
     with open(cible, "w", encoding="utf-8") as f:
         f.write(texte)

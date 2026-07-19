@@ -1,5 +1,5 @@
 // Onglet Carnet de bord — journal de recherche.
-import { h, vider } from "../noyau/dom.js";
+import { h, vider, actionnable } from "../noyau/dom.js";
 import { aller } from "../noyau/etat.js";
 import { apiGet, apiJson } from "../noyau/api.js";
 import { badge } from "../composants/badge.js";
@@ -93,7 +93,7 @@ export async function vueCarnet(vue) {
         toast("Entrée ajoutée.");
       }
       reinit(); charger();
-    } catch (e) { toast(e.message); }
+    } catch (e) { toast(e.message, { type: "erreur" }); }
   });
   const micro = boutonMicro(fTexte);   // null si le navigateur ne sait pas dicter
   vue.append(h("div", { class: "carte" },
@@ -139,7 +139,7 @@ function entree(e, recharger, editer) {
       h("strong", {}, e.titre || "(sans titre)"),
       h("span", { style: "color:var(--gris-clair);font-size:12px" }, e.date),
       ...((e.personnes_noms || []).map((p) =>
-        h("span", { class: "puce-pers", onclick: () => aller("personnes", { fiche: p.id }) }, "👤 " + (p.nom || p.id)))),
+        actionnable(h("span", { class: "puce-pers", onclick: () => aller("personnes", { fiche: p.id }) }, "👤 " + (p.nom || p.id))))),
       h("span", { style: "margin-left:auto" }),
       h("button", { class: "lien", style: "font-size:12px",
         onclick: () => editer(e) }, "éditer"),

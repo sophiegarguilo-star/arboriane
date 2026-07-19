@@ -1,5 +1,5 @@
 // Onglet « Espace de travail » — un arbre = un dossier.
-import { h } from "../noyau/dom.js";
+import { h, actionnable } from "../noyau/dom.js";
 import { aller, majEspace } from "../noyau/etat.js";
 import { apiGet, apiJson } from "../noyau/api.js";
 import { badge } from "../composants/badge.js";
@@ -13,6 +13,60 @@ function humaniser(octets) {
 }
 
 async function rafraichir() { await majEspace(apiGet); await aller("espace"); }
+
+// Bandeau « fichier corrompu » (DAT-03) : affiché ici et au tableau de bord
+// quand /api/espace signale que le JSON a été mis en quarantaine au chargement.
+export function bandeauCorrompu() {
+  return h("div", { class: "carte", role: "alert",
+    style: "border-color:var(--alerte, #c0392b);margin-bottom:14px" },
+    h("p", { style: "margin:0 0 8px" }, "⚠️ ",
+      h("strong", {}, "Votre fichier était illisible"),
+      " ; une copie a été mise de côté et l'arbre est reparti de la dernière "
+      + "version saine. Vous pouvez restaurer une sauvegarde ci-dessous."),
+    h("button", { class: "bouton petit", onclick: () => aller("espace") },
+      "⏪ Revenir en arrière"));
+}
+
+// ── « Revenir en arrière » (GED-02) : copies automatiques de l'arbre actif ──
+async function restaurerArchive(a) {
+  const quoi = "la copie du " + a.date
+    + (a.personnes != null ? " (" + a.personnes + " personne(s))" : "");
+  if (!await confirmer("Revenir à " + quoi + " ? L'état actuel sera lui-même "
+    + "sauvegardé d'abord : rien n'est perdu, vous pourrez y revenir.",
+    { titre: "Revenir en arrière", valider: "Restaurer cette copie" })) return;
+  try {
+    const r = await apiJson("/api/archives/restaurer", "POST", { nom: a.nom });
+    await majEspace(apiGet);
+    toast("Arbre restauré : " + r.personnes + " personne(s).");
+    aller("accueil");
+  } catch (e) { toast(e.message, { type: "erreur" }); }
+}
+
+async function blocArchives() {
+  const carte = h("div", { class: "carte", style: "margin-top:18px" },
+    h("h2", {}, "⏪ Revenir en arrière"),
+    h("p", { class: "sous-titre" },
+      "Arboriane garde des copies automatiques de l'arbre actif (dossier "
+      + "Sauvegardes/). Restaurer une copie remet l'arbre dans l'état de ce "
+      + "moment-là — l'état actuel est lui-même sauvegardé d'abord."));
+  let archives = [];
+  try { archives = (await apiGet("/api/archives")).archives || []; }
+  catch { /* pas d'arbre ouvert : bloc masqué par l'appelant */ }
+  if (!archives.length) {
+    carte.append(h("div", { class: "vide compacte" },
+      "Aucune copie automatique pour l'instant : elles se créent au fil de "
+      + "vos modifications."));
+    return carte;
+  }
+  archives.slice(0, 15).forEach((a) => carte.append(
+    h("div", { class: "rangee", style: "padding:6px 0;border-bottom:1px solid var(--bord);gap:10px" },
+      h("span", {}, "🕘 " + a.date),
+      h("span", { style: "color:var(--gris);font-size:13px" },
+        a.personnes != null ? a.personnes + " personne(s)" : "contenu illisible"),
+      h("button", { class: "bouton secondaire petit pousse",
+        onclick: () => restaurerArchive(a) }, "Restaurer"))));
+  return carte;
+}
 
 // Verrou souple : demande confirmation si l'arbre (dossier synchronisé) semble
 // ouvert sur un AUTRE ordinateur. Renvoie true si on doit ouvrir quand même.
@@ -34,7 +88,7 @@ async function ouvrir(chemin) {
     await majEspace(apiGet);
     toast("Arbre « " + r.nom + " » ouvert.");
     aller("accueil");                    // droit au tableau de bord
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(e.message, { type: "erreur" }); }
 }
 
 async function creerArbre() {
@@ -59,7 +113,7 @@ async function creerArbre() {
       const d = await apiJson("/api/espaces/choisir-dossier", "POST", {});
       if (!d.chemin) { toast("Aucun dossier choisi."); return; }
       emplacement = d.chemin;
-    } catch (e) { toast(e.message); return; }
+    } catch (e) { toast(e.message, { type: "erreur" }); return; }
   }
 
   try {
@@ -69,7 +123,7 @@ async function creerArbre() {
     toast(emplacement ? ("Arbre « " + r.nom + " » créé dans " + emplacement)
                       : ("Arbre « " + r.nom + " » créé."));
     aller("accueil");
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(e.message, { type: "erreur" }); }
 }
 
 async function ouvrirDemo() {
@@ -78,7 +132,7 @@ async function ouvrirDemo() {
     await majEspace(apiGet);
     toast("Arbre de démonstration ouvert.");
     aller("accueil");
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(e.message, { type: "erreur" }); }
 }
 
 // Restauration d'une SAUVEGARDE complète (.zip) : le fichier est choisi dans un
@@ -92,7 +146,7 @@ async function restaurerSauvegarde() {
     await majEspace(apiGet);
     toast("Arbre « " + r.nom + " » restauré.");
     aller("accueil");
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(e.message, { type: "erreur" }); }
 }
 
 function carteArbre(a) {
@@ -104,28 +158,32 @@ function carteArbre(a) {
       const nom = await demander("Nouveau nom de l'arbre :",
         { titre: "Renommer", defaut: a.nom, valider: "Renommer" });
       if (nom == null) return;
-      await apiJson("/api/espaces/renommer", "POST", { chemin: a.chemin, nom });
-      toast("Arbre renommé."); rafraichir();
+      try {
+        await apiJson("/api/espaces/renommer", "POST", { chemin: a.chemin, nom });
+        toast("Arbre renommé."); rafraichir();
+      } catch (e) { toast(e.message, { type: "erreur" }); }
     } }, "Renommer"),
     h("button", { class: "bouton secondaire petit", onclick: async () => {
       try {
         const r = await apiJson("/api/espaces/dupliquer", "POST", { chemin: a.chemin });
         toast("Arbre dupliqué."); rafraichir();
-      } catch (e) { toast(e.message); }
+      } catch (e) { toast(e.message, { type: "erreur" }); }
     }, title: "Créer une copie indépendante" }, "Dupliquer"),
     h("button", { class: "bouton secondaire petit", onclick: async () => {
       try {
         const r = await apiJson("/api/espaces/sauvegarde", "POST", {});
         toast("Sauvegarde créée : " + r.fichier);
-      } catch (e) { toast(e.message); }
+      } catch (e) { toast(e.message, { type: "erreur" }); }
     }, title: "Sauvegarde complète .zip (arbre actif)",
        "aria-label": "Créer une sauvegarde complète" }, "💾 Sauvegarde"),
     h("button", { class: "bouton secondaire petit", onclick: async () => {
       if (!await confirmer("Retirer « " + a.nom + " » de la liste ? Le dossier n'est PAS "
         + "supprimé : vous pourrez le rouvrir plus tard.",
         { titre: "Retirer de la liste", valider: "Retirer" })) return;
-      await apiJson("/api/espaces/oublier", "POST", { chemin: a.chemin });
-      toast("Arbre retiré de la liste."); rafraichir();
+      try {
+        await apiJson("/api/espaces/oublier", "POST", { chemin: a.chemin });
+        toast("Arbre retiré de la liste."); rafraichir();
+      } catch (e) { toast(e.message, { type: "erreur" }); }
     } }, "Retirer"),
     h("button", { class: "bouton danger petit",
       onclick: async () => {
@@ -135,13 +193,13 @@ function carteArbre(a) {
         try {
           const r = await apiJson("/api/espaces/supprimer", "POST", { chemin: a.chemin });
           toast("Arbre supprimé (archive : " + r.archive + ")."); rafraichir();
-        } catch (e) { toast(e.message); }
+        } catch (e) { toast(e.message, { type: "erreur" }); }
       } }, "Supprimer"));
 
   if (a.actif) actions.append(h("button", { class: "bouton secondaire petit",
     onclick: async () => {
       try { await apiJson("/api/espaces/ouvrir-dossier", "POST", {}); }
-      catch (e) { toast(e.message); }
+      catch (e) { toast(e.message, { type: "erreur" }); }
     }, title: "Ouvrir le dossier de l'arbre dans l'explorateur de fichiers" }, "📂 Dossier"));
 
   return h("div", { class: "carte-arbre" + (a.actif ? " actif" : "") },
@@ -157,14 +215,19 @@ function carteArbre(a) {
 }
 
 export async function vueEspace(vue) {
+  const esp = await majEspace(apiGet);
   vue.append(h("h1", {}, "Espace de travail"));
+  // fichier mis en quarantaine au chargement : le dire, et guider vers les copies
+  if (esp && esp.ouvert && esp.avertissement === "corrompu") {
+    vue.append(bandeauCorrompu());
+  }
   vue.append(h("p", { class: "sous-titre" },
     "Un arbre = un dossier : chacun a ses propres personnes, sources et carnet. "
     + "Tout reste en fichiers lisibles sur votre ordinateur."));
 
   const grille = h("div", { class: "grille-arbres" });
-  grille.append(h("div", { class: "carte-arbre carte-neuve", onclick: creerArbre },
-    "➕ Créer un nouvel arbre"));
+  grille.append(actionnable(h("div", { class: "carte-arbre carte-neuve", onclick: creerArbre },
+    "➕ Créer un nouvel arbre")));
 
   let espaces = [];
   try { espaces = (await apiGet("/api/espaces")).espaces; } catch { /* vide */ }
@@ -211,8 +274,12 @@ export async function vueEspace(vue) {
       await majEspace(apiGet);
       toast("Arbre « " + r.nom + " » importé.");
       aller("accueil");
-    } catch (e) { toast(e.message); }
+    } catch (e) { toast(e.message, { type: "erreur" }); }
   });
+
+  // « Revenir en arrière » : seulement si un arbre est ouvert (les copies
+  // automatiques appartiennent à l'arbre actif).
+  if (esp && esp.ouvert) vue.append(await blocArchives());
 
   vue.append(h("div", { class: "barre-actions", style: "margin-top:18px;flex-wrap:wrap" },
     h("button", { class: "bouton secondaire", onclick: ouvrirDemo },

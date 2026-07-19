@@ -54,7 +54,12 @@ def supprimer(app, params, corps, sid):
 
 @route("POST", r"^/api/sources/(?P<sid>[A-Za-z0-9]+)/personne$")
 def taguer(app, params, corps, sid):
-    src = _base(app).taguer_personne_source(sid, corps.get("id"), corps.get("role", ""))
+    # Entrées typées (contrôle post-corrections) : un id non-chaîne stocké tel
+    # quel cassait ensuite l'écran Actes (tri sur types mélangés).
+    pid = corps.get("id")
+    if not isinstance(pid, str) or not pid.strip():
+        raise ErreurValidation("Indiquez la personne à relier (id).")
+    src = _base(app).taguer_personne_source(sid, pid.strip(), str(corps.get("role", ""))[:200])
     if not src:
         return (404, {"erreur": "Source introuvable."})
     return {"ok": True}
@@ -74,10 +79,37 @@ def citer(app, params, corps, pid):
 
 @route("GET", r"^/api/individus/(?P<pid>[A-Za-z0-9]+)/preuves$")
 def preuves(app, params, corps, pid):
-    p = src_svc.preuves_personne(_base(app).donnees, pid)
+    base = _base(app)
+    p = src_svc.preuves_personne(base.donnees, pid)
     if p is None:
         return (404, {"erreur": "Personne introuvable."})
+    # Détail des citations de CHAQUE fait (titre de source, page, fiabilité) :
+    # la table « Preuves par fait » peut ainsi se déplier et retirer une preuve.
+    # La liste vient du même aiguillage que citer()/retirer_citation — l'index
+    # affiché est donc TOUJOURS celui attendu par /retirer-citation.
+    srcs = base.donnees.get("sources", {})
+    for f in p.get("faits", []):
+        cits = base.citations_de(pid, f.get("fait"), f.get("famille"))
+        f["citations"] = [{
+            "source": c.get("source") or "",
+            "titre": ((srcs.get(c.get("source")) or {}).get("titre")
+                      or c.get("source") or "(source libre)"),
+            "page": c.get("page") or "",
+            "quay": c.get("quay"),
+        } for c in cits]
     return p
+
+
+@route("POST", r"^/api/individus/(?P<pid>[A-Za-z0-9]+)/retirer-citation$")
+def retirer_citation(app, params, corps, pid):
+    """Retire UNE citation (preuve) d'un fait : {fait, index, famille?}.
+    La source, elle, reste intacte — seul le lien fait↔source est défait."""
+    ind = _base(app).retirer_citation(pid, corps.get("fait", "personne"),
+                                      corps.get("index"),
+                                      famille=corps.get("famille"))
+    if not ind:
+        return (404, {"erreur": "Cette preuve n'existe pas (ou plus)."})
+    return {"ok": True}
 
 
 # ── Médias (upload base64) ────────────────────────────────────────────

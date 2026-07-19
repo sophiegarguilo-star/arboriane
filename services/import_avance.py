@@ -112,6 +112,49 @@ def comparer_detaille(app, texte):
     }
 
 
+def _distributeur_ids(table, prefixe):
+    """Distributeur d'identifiants libres, équivalent à des appels répétés de
+    `modele.nouvel_id` mais sans repartir de 1 à chaque fois : sur un gros
+    import (GED-03), ce rebalayage rendait l'ajout de N personnes quadratique.
+    La table ne fait que GROSSIR pendant l'import, donc avancer d'un cran après
+    chaque attribution rend exactement la même suite d'identifiants (les trous
+    sont comblés en ordre croissant, comme avant)."""
+    n = 1
+
+    def suivant():
+        nonlocal n
+        while ("%s%d" % (prefixe, n)) in table:
+            n += 1
+        nid = "%s%d" % (prefixe, n)
+        n += 1
+        return nid
+    return suivant
+
+
+def _cle_json(item):
+    """Clé de dédoublonnage d'un élément de liste (dict, chaîne…) : sa forme
+    JSON à clés triées. Deux dicts égaux donnent la même clé, quel que soit
+    l'ordre de leurs champs — exactement ce que testait « item in liste »,
+    mais en O(1) au lieu d'une comparaison à chaque élément déjà présent."""
+    return json.dumps(item, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def _fusionner_liste(fusion, entrants):
+    """Ajoute à `fusion` les éléments de `entrants` qui n'y sont pas encore.
+    Renvoie True si au moins un élément a été ajouté. Le test d'appartenance
+    passe par un ensemble de clés sérialisées : sur un GEDCOM de 10 Mo, les
+    « not in liste » répétés rendaient l'import quadratique (GED-03)."""
+    vus = {_cle_json(x) for x in fusion}
+    ajoute = False
+    for item in entrants:
+        cle = _cle_json(item)
+        if cle not in vus:
+            vus.add(cle)
+            fusion.append(item)
+            ajoute = True
+    return ajoute
+
+
 def _completer(actuel, entrant):
     """Complète les champs VIDES de `actuel` avec ceux de `entrant` (jamais
     d'écrasement). Renvoie la liste des champs complétés."""
@@ -131,20 +174,14 @@ def _completer(actuel, entrant):
         # Fusionne les citations (preuves) de l'événement — sinon les actes de
         # naissance/décès de l'import seraient perdus. Les refs sont déjà réindexées.
         cits = list(ea.get("citations") or [])
-        for c in (ee.get("citations") or []):
-            if c not in cits:
-                cits.append(c)
-                if evt not in completes:
-                    completes.append(evt)
+        if _fusionner_liste(cits, ee.get("citations") or []):
+            if evt not in completes:
+                completes.append(evt)
         if cits:
             ea["citations"] = cits
     for cle in _CHAMPS_LISTES:
         fusion = list(actuel.get(cle) or [])
-        ajoute = False
-        for item in (entrant.get(cle) or []):
-            if item not in fusion:
-                fusion.append(item)
-                ajoute = True
+        ajoute = _fusionner_liste(fusion, entrant.get(cle) or [])
         actuel[cle] = fusion
         if ajoute:
             completes.append(cle)
@@ -176,14 +213,16 @@ def _importer_sources(nouveau, donnees):
     ancien_sid -> nouveau_sid pour réécrire les citations. Sans cela, une citation
     importée « S3 » pointerait vers la source « S3 » — différente — de l'arbre."""
     carte_dep = {}
+    prochain_dep = _distributeur_ids(donnees.setdefault("depots", {}), "R")
     for did, dep in (nouveau.get("depots") or {}).items():
-        nd = modele.nouvel_id(donnees.setdefault("depots", {}), "R")
+        nd = prochain_dep()
         d2 = dict(dep); d2["id"] = nd
         donnees["depots"][nd] = d2
         carte_dep[did] = nd
     carte = {}
+    prochain_src = _distributeur_ids(donnees.setdefault("sources", {}), "S")
     for sid, src in (nouveau.get("sources") or {}).items():
-        ns = modele.nouvel_id(donnees.setdefault("sources", {}), "S")
+        ns = prochain_src()
         s2 = dict(src); s2["id"] = ns
         if s2.get("depot_id") in carte_dep:
             s2["depot_id"] = carte_dep[s2["depot_id"]]
@@ -208,21 +247,36 @@ def _remap_citations_famille(fam, carte):
             fix(ev.get("citations"))
 
 
-def _famille_du_couple(donnees, mari, epouse, candidates):
-    """Famille existante unissant exactement ces deux personnes, sinon None.
+def _index_familles_libres(donnees):
+    """Index des familles DÉJÀ présentes, par couple : {(mari, epouse): [fids]}.
 
-    `candidates` = identifiants encore libres : une famille entrante ne peut en
-    réclamer qu'UNE. Sans quoi un remariage du même couple (deux FAM distincts,
-    deux dates de mariage — cas REMARR.GED de gedcom.org) serait replié sur une
-    seule famille, et la seconde union disparaîtrait.
+    Chaque fid est « libre » : une famille entrante ne peut en réclamer qu'UNE
+    (retrait de la liste). Sans quoi un remariage du même couple (deux FAM
+    distincts, deux dates de mariage — cas REMARR.GED de gedcom.org) serait
+    replié sur une seule famille, et la seconde union disparaîtrait.
+
+    Construit AVANT la boucle d'import : l'ancien balayage répété de la liste
+    des familles rendait l'import fusionnant quadratique (GED-03, 107 s sur un
+    GEDCOM de 10 Mo). Les listes gardent l'ordre d'insertion de la table, donc
+    la première famille candidate reste la même qu'avant.
     """
+    index = {}
+    for fid, fam in donnees["familles"].items():
+        mari, epouse = fam.get("mari"), fam.get("epouse")
+        if mari and epouse:
+            index.setdefault((mari, epouse), []).append(fid)
+    return index
+
+
+def _famille_du_couple(donnees, mari, epouse, index_libres):
+    """Famille existante encore libre unissant exactement ces deux personnes,
+    sinon None. La famille rendue est RETIRÉE des libres (réclamée)."""
     if not (mari and epouse):
         return None
-    for fid in candidates:
-        fam = donnees["familles"].get(fid)
-        if fam and fam.get("mari") == mari and fam.get("epouse") == epouse:
-            return fam
-    return None
+    fids = index_libres.get((mari, epouse))
+    if not fids:
+        return None
+    return donnees["familles"].get(fids.pop(0))
 
 
 def _fusionner_familles(nouveau, donnees, carte_ind, carte_src):
@@ -236,8 +290,11 @@ def _fusionner_familles(nouveau, donnees, carte_ind, carte_src):
     ajoutees = completees = 0
     # Seules les familles DÉJÀ présentes avant l'import peuvent être complétées,
     # et chacune une seule fois : on ne replie pas deux unions entrantes du même
-    # couple l'une sur l'autre.
-    libres = list(donnees["familles"].keys())
+    # couple l'une sur l'autre. L'index est figé AVANT la boucle : les familles
+    # ajoutées pendant l'import n'y entrent jamais (comme avant, où `libres`
+    # était un instantané des clés).
+    libres = _index_familles_libres(donnees)
+    prochain_fid = _distributeur_ids(donnees["familles"], "F")
     for fam in nouveau["familles"].values():
         mari = carte_ind.get(fam.get("mari") or "", "")
         epouse = carte_ind.get(fam.get("epouse") or "", "")
@@ -247,11 +304,9 @@ def _fusionner_familles(nouveau, donnees, carte_ind, carte_src):
         # Les deux modes doivent rendre le même arbre — sinon l'utilisateur perd
         # des données selon le bouton qu'il a choisi.
         cible = _famille_du_couple(donnees, mari, epouse, libres)
-        if cible is not None:
-            libres.remove(cible["id"])
         if cible is None:
             _remap_citations_famille(fam, carte_src)
-            fid = modele.nouvel_id(donnees["familles"], "F")
+            fid = prochain_fid()
             donnees["familles"][fid] = {
                 "id": fid, "mari": mari, "epouse": epouse, "enfants": enfants,
                 "mariage": dict(fam.get("mariage") or {}),
@@ -311,6 +366,7 @@ def fusionner_import(app, texte, corrections_lieux=None):
 
         ajoutees = completees = 0
         carte_ind = {}          # id entrant -> id retenu dans la base
+        prochain_iid = _distributeur_ids(donnees["individus"], "I")
         for entrant in nouveau["individus"].values():
             _remap_citations_personne(entrant, carte_src)   # réf. sources -> nouveaux ids
             cle = _cle(entrant)
@@ -320,7 +376,7 @@ def fusionner_import(app, texte, corrections_lieux=None):
                     completees += 1
                 carte_ind[entrant["id"]] = cible["id"]
             else:
-                nid = modele.nouvel_id(donnees["individus"], "I")
+                nid = prochain_iid()
                 copie = dict(entrant)
                 copie["id"] = nid
                 # famc/fams sont DÉRIVÉS de la table des familles : on les vide

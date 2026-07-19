@@ -233,6 +233,7 @@ def exporter_gedcom_public(app, options=None):
     pub = preparer(app.base.donnees, options)
     texte = gedcom.exporter(pub)
     c = chemins(app.espace_chemin)
+    os.makedirs(c["exports"], exist_ok=True)   # un .zip restauré peut ne pas contenir Exports/
     cible = dans(c["exports"], "%s_publication_%s.ged"
                  % (nom_sur(app.manifeste.get("nom", "arbre")), horodatage()))
     with open(cible, "w", encoding="utf-8") as f:
@@ -322,6 +323,7 @@ def exporter_gedzip(app, options=None, taille_max=None):
 
     c = chemins(app.espace_chemin)
     suffixe = "publication_" if options is not None else ""
+    os.makedirs(c["exports"], exist_ok=True)   # un .zip restauré peut ne pas contenir Exports/
     cible = dans(c["exports"], "%s_%s%s.gdz"
                  % (nom_sur(app.manifeste.get("nom", "arbre")),
                     suffixe, horodatage()))

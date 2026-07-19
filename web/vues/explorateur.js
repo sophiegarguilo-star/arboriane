@@ -1,7 +1,7 @@
 // Explorateur de fichiers de l'arbre : parcourir les dossiers de l'arbre actif
 // (Sources, Photos, Exports, Sauvegardes, GEDCOM, journaux…), aperçu des images,
 // et ouverture d'un dossier dans l'explorateur Windows. Confiné à l'arbre.
-import { h, vider } from "../noyau/dom.js";
+import { h, vider, actionnable } from "../noyau/dom.js";
 import { apiGet, apiJson } from "../noyau/api.js";
 import { toast } from "../composants/toast.js";
 import { ouvrirModale } from "../composants/modale.js";
@@ -54,26 +54,26 @@ export async function vueExplorateur(vue, arg) {
     fil.append(h("span", { style: "flex:1" }));
     fil.append(h("button", { class: "bouton petit secondaire", onclick: async () => {
       try { await apiJson("/api/explorateur/ouvrir", "POST", { chemin }); }
-      catch (e) { toast(e.message); }
+      catch (e) { toast(e.message, { type: "erreur" }); }
     } }, "Ouvrir dans l'explorateur Windows"));
     zone.append(fil);
 
     // — Liste —
     const carte = h("div", { class: "carte" });
     if (chemin) {
-      carte.append(h("div", { class: "ligne-pers", onclick: () => {
+      carte.append(actionnable(h("div", { class: "ligne-pers", onclick: () => {
         chemin = chemin.split("/").slice(0, -1).join("/"); rendre();
-      } }, h("strong", {}, "⬆ Dossier parent")));
+      } }, h("strong", {}, "⬆ Dossier parent"))));
     }
     if (!d.dossiers.length && !d.fichiers.length) {
       carte.append(h("p", { class: "vide compacte" }, "Dossier vide."));
     }
     d.dossiers.forEach((f) => carte.append(
-      h("div", { class: "ligne-pers", onclick: () => {
+      actionnable(h("div", { class: "ligne-pers", onclick: () => {
         chemin = chemin ? chemin + "/" + f.nom : f.nom; rendre();
       } },
         h("strong", {}, "📁 " + f.nom),
-        h("span", { class: "meta" }, quand(f.modifie)))));
+        h("span", { class: "meta" }, quand(f.modifie))))));
     d.fichiers.forEach((f) => {
       const rel = chemin ? chemin + "/" + f.nom : f.nom;
       const ligne = h("div", { class: "ligne-pers" },
@@ -90,7 +90,7 @@ export async function vueExplorateur(vue, arg) {
           } else { toast("Aperçu indisponible pour ce fichier."); }
         } else {
           try { await apiJson("/api/explorateur/ouvrir", "POST", { chemin: rel }); }
-          catch (e) { toast(e.message); }
+          catch (e) { toast(e.message, { type: "erreur" }); }
         }
       });
       carte.append(ligne);

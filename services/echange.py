@@ -7,6 +7,8 @@ total), on alerte en cas de forte réduction, et on ne remplace la base
 qu'après confirmation — toujours précédé d'une sauvegarde horodatée.
 """
 
+import os
+
 from core import gedcom, modele
 from core.espace import chemins
 from core.fichiers import dans, horodatage, nom_sur
@@ -23,6 +25,7 @@ def exporter(app):
         raise ValueError("Aucun arbre ouvert.")
     texte = gedcom.exporter(app.base.donnees)
     c = chemins(app.espace_chemin)
+    os.makedirs(c["exports"], exist_ok=True)   # un .zip restauré peut ne pas contenir Exports/
     cible = dans(c["exports"], "%s_%s.ged"
                  % (nom_sur(app.manifeste.get("nom", "arbre")), horodatage()))
     with open(cible, "w", encoding="utf-8") as f:

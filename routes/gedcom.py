@@ -56,6 +56,10 @@ def appliquer(app, params, corps):
                                    enc.get("fiable"), texte)
     corr = (corps or {}).get("corrections_lieux") or None
     resultat = echange.appliquer(app, texte, corr)
+    # Balises niveau 1-2 non reconnues à la lecture (comptées par l'importateur,
+    # rangées dans meta) : remontées pour le bilan d'import (PARC-11).
+    resultat["non_lues"] = app.base.donnees.get("meta", {}).get(
+        "balises_non_lues") or {}
     # Le manifeste porte « I1 » par défaut ; un GEDCOM importé peut n'avoir aucun
     # I1 → Sosa et arbre resteraient muets. On adopte alors la 1re personne.
     inds = app.base.donnees["individus"]

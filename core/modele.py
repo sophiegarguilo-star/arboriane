@@ -44,6 +44,39 @@ def nouvel_id(table, prefixe):
     return "%s%d" % (prefixe, n)
 
 
+def _plus_grand_numero(table, prefixe):
+    """Plus grand n des identifiants « <prefixe><n> » présents dans la table."""
+    maxi = 0
+    for cle in table:
+        suffixe = str(cle)[len(prefixe):]
+        if str(cle).startswith(prefixe) and suffixe.isdigit():
+            maxi = max(maxi, int(suffixe))
+    return maxi
+
+
+def nouvel_id_monotone(donnees, cle_table, prefixe):
+    """Identifiant JAMAIS réutilisé : compteur monotone persisté dans
+    donnees["meta"]["compteurs"]. Après suppression de I57, le prochain individu
+    ne redevient pas I57 (il hériterait des références orphelines : citations,
+    associations…). Rétrocompatible : sans compteur, on part du plus grand
+    identifiant existant."""
+    meta = donnees.get("meta")
+    if not isinstance(meta, dict):          # vieux fichier où meta n'est pas un dict
+        meta = {}
+        donnees["meta"] = meta
+    compteurs = meta.get("compteurs")
+    if not isinstance(compteurs, dict):
+        compteurs = {}
+        meta["compteurs"] = compteurs
+    try:
+        compteur = int(compteurs.get(prefixe, 0) or 0)
+    except (TypeError, ValueError):
+        compteur = 0
+    n = max(compteur, _plus_grand_numero(donnees.get(cle_table) or {}, prefixe)) + 1
+    compteurs[prefixe] = n
+    return "%s%d" % (prefixe, n)
+
+
 def base_vide():
     """Une base neuve, toutes les clés garanties."""
     return {cle: {} for cle in CLES_BASE}

@@ -1,7 +1,7 @@
 // Onglet « Qualité des sources » (Lot 5) — 6 vérifications orientées preuves :
 // fichiers manquants, à transcrire, plan par dépôt, sexes absents (avec
 // validation de la déduction), noms absents, export du compte-rendu de cohérence.
-import { h } from "../noyau/dom.js";
+import { h, actionnable } from "../noyau/dom.js";
 import { aller } from "../noyau/etat.js";
 import { apiGet, apiJson } from "../noyau/api.js";
 import { badge } from "../composants/badge.js";
@@ -56,14 +56,14 @@ function carteLieuxSansPays(lst, paysDefaut) {
   } else {
     c.append(h("p", { class: "sous-titre" },
       "Astuce : définissez un « Pays par défaut » dans ",
-      h("span", { class: "lien", style: "cursor:pointer", onclick: () => aller("reglages") },
-        "Réglages"), " pour l'ajouter en un clic."));
+      actionnable(h("span", { class: "lien", style: "cursor:pointer", onclick: () => aller("reglages") },
+        "Réglages")), " pour l'ajouter en un clic."));
   }
   const box = h("div", { class: "liste-pers compacte liste-defilante" });
   lst.slice(0, 60).forEach((x) => box.append(
-    h("div", { class: "ligne-pers", onclick: () => aller("lieux", { focus: x.nom }) },
+    actionnable(h("div", { class: "ligne-pers", onclick: () => aller("lieux", { focus: x.nom }) },
       h("strong", {}, x.nom),
-      h("span", { class: "meta" }, x.nb + " occurrence(s)"))));
+      h("span", { class: "meta" }, x.nb + " occurrence(s)")))));
   c.append(box);
   return c;
 }
@@ -79,9 +79,9 @@ function carteDatesDouteuses(dd) {
   }
   const box = h("div", { class: "liste-pers compacte liste-defilante" });
   dd.slice(0, 60).forEach((x) => box.append(
-    h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: x.id }) },
+    actionnable(h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: x.id }) },
       h("strong", {}, x.nom),
-      h("span", { class: "meta" }, x.contexte + " : « " + x.date + " » — " + x.raison))));
+      h("span", { class: "meta" }, x.contexte + " : « " + x.date + " » — " + x.raison)))));
   c.append(box);
   return c;
 }
@@ -98,11 +98,11 @@ function carteFichiers(fm) {
   if (!n) { c.append(h("p", { class: "vide compacte" }, "Tous les scans sont là. 🎉")); return c; }
   const box = h("div", { class: "liste-pers compacte" });
   fm.manquants.slice(0, 50).forEach((m) => box.append(
-    h("div", { class: "ligne-pers",
+    actionnable(h("div", { class: "ligne-pers",
       onclick: () => aller(m.origine === "source" ? "actes" : "personnes",
         m.origine === "source" ? { source: m.id } : { fiche: m.id }) },
       h("strong", {}, "✕ " + m.fichier),
-      h("span", { class: "meta" }, m.contexte))));
+      h("span", { class: "meta" }, m.contexte)))));
   c.append(box);
   return c;
 }
@@ -113,9 +113,9 @@ function carteTranscrire(at) {
   if (!at.total) { c.append(h("p", { class: "vide compacte" }, "Tout est transcrit. 🎉")); return c; }
   const box = h("div", { class: "liste-pers compacte" });
   at.sources.slice(0, 50).forEach((s) => box.append(
-    h("div", { class: "ligne-pers", onclick: () => aller("actes", { source: s.id }) },
+    actionnable(h("div", { class: "ligne-pers", onclick: () => aller("actes", { source: s.id }) },
       h("strong", {}, s.titre || s.id),
-      s.date ? h("span", { class: "meta" }, s.date) : null)));
+      s.date ? h("span", { class: "meta" }, s.date) : null))));
   c.append(box);
   return c;
 }
@@ -129,8 +129,8 @@ function cartePlanDepot(pd) {
       h("strong", {}, g.depot), " ", badge(g.nb + " acte" + (g.nb > 1 ? "s" : ""))));
     const box = h("div", { class: "liste-pers compacte" });
     g.pistes.forEach((p) => box.append(
-      h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: p.personne }) },
-        h("strong", {}, p.personne_nom), h("span", { class: "meta" }, p.quoi))));
+      actionnable(h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: p.personne }) },
+        h("strong", {}, p.personne_nom), h("span", { class: "meta" }, p.quoi)))));
     det.append(box); c.append(det);
   });
   return c;
@@ -228,9 +228,9 @@ function carteNoms(na) {
   if (!na.total) { c.append(h("p", { class: "vide compacte" }, "Toutes les fiches sont nommées. 🎉")); return c; }
   const box = h("div", { class: "liste-pers compacte" });
   na.personnes.slice(0, 60).forEach((p) => box.append(
-    h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: p.id }) },
+    actionnable(h("div", { class: "ligne-pers", onclick: () => aller("personnes", { fiche: p.id }) },
       h("strong", {}, p.nom),
-      h("span", { class: "meta" }, libelle[p.manque] || "?"))));
+      h("span", { class: "meta" }, libelle[p.manque] || "?")))));
   c.append(box);
   return c;
 }
@@ -243,9 +243,9 @@ function carteCoherence(coh) {
   if (coh.total) {
     const box = h("div", { class: "liste-pers compacte" });
     coh.alertes.slice(0, 3).forEach((a) => box.append(
-      h("div", { class: "ligne-pers",
+      actionnable(h("div", { class: "ligne-pers",
         onclick: () => a.personne && aller("personnes", { fiche: a.personne }) },
-        h("strong", {}, a.personne_nom || "—"), h("span", { class: "meta" }, a.message))));
+        h("strong", {}, a.personne_nom || "—"), h("span", { class: "meta" }, a.message)))));
     c.append(box);
   }
   c.append(h("div", { class: "barre-actions" },

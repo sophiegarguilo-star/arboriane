@@ -1,6 +1,6 @@
 // Personnes — sections de la fiche : chronologie, pistes, documents,
 // sources/preuves, photos.
-import { h, vider } from "../../noyau/dom.js";
+import { h, vider, actionnable } from "../../noyau/dom.js";
 import { aller } from "../../noyau/etat.js";
 import { apiGet, apiJson } from "../../noyau/api.js";
 import { badge } from "../../composants/badge.js";
@@ -128,11 +128,11 @@ export function sectionChronologie(f) {
     const [ico, cls] = iconeEvt(it.lib);
     const pr = it.preuve;
     const badgePreuve = pr
-      ? h("span", { class: "badge " + (pr.niveau === "acte" ? "ok" : "info")
+      ? actionnable(h("span", { class: "badge " + (pr.niveau === "acte" ? "ok" : "info")
           + (pr.sid ? " cliquable" : ""), title: pr.sid ? "Ouvrir la source" : "",
           style: pr.sid ? "cursor:pointer" : "",
           onclick: pr.sid ? () => aller("actes", { source: pr.sid }) : null },
-          (pr.niveau === "acte" ? "Prouvé par acte" : "Source"))
+          (pr.niveau === "acte" ? "Prouvé par acte" : "Source")))
       : null;
     const btnSource = it.fait
       ? h("button", { class: "lien pousse", style: "font-size:12px;white-space:nowrap",
@@ -149,8 +149,8 @@ export function sectionChronologie(f) {
           badgePreuve,
           btnSource),
         it.txt ? h("div", { class: "tl-detail" }, it.txt) : null,
-        pr && pr.titre ? h("div", { class: "tl-source",
-          onclick: () => aller("actes", { source: pr.sid }) }, "📄 " + pr.titre) : null)));
+        pr && pr.titre ? actionnable(h("div", { class: "tl-source",
+          onclick: () => aller("actes", { source: pr.sid }) }, "📄 " + pr.titre)) : null)));
   });
   carte.append(frise);
   return carte;
@@ -167,7 +167,7 @@ export function sectionPistes(f, pid) {
   async function sauver() {
     f.pistes = pistes;
     try { await apiJson("/api/individus/" + pid, "PUT", { pistes }); }
-    catch (e) { toast(e.message); }
+    catch (e) { toast(e.message, { type: "erreur" }); }
   }
 
   const liste = h("div", {});
@@ -222,7 +222,7 @@ export function sectionDocuments(f) {
           style: "width:100%;height:90px;object-fit:cover;border-radius:6px 6px 0 0" })
       : h("div", { style: "height:90px;display:flex;align-items:center;justify-content:center;"
           + "background:var(--sauge-pale);border-radius:6px 6px 0 0;font-size:26px" }, "📄");
-    grille.append(h("div", { style: "border:1px solid var(--bord);border-radius:8px;"
+    grille.append(actionnable(h("div", { style: "border:1px solid var(--bord);border-radius:8px;"
       + "overflow:hidden;cursor:pointer", onclick: () => aller("actes", { source: s.id }) },
       vign,
       h("div", { style: "padding:6px 8px" },
@@ -230,7 +230,7 @@ export function sectionDocuments(f) {
         h("div", { style: "font-size:11px;color:var(--gris);margin-top:2px" },
           [s.type, s.date].filter(Boolean).join(" · ") || "—"),
         h("div", { style: "font-size:11px;margin-top:3px" },
-          badge(s.role, s.sujet ? "info" : "")))));
+          badge(s.role, s.sujet ? "info" : ""))))));
   });
   carte.append(grille);
   return carte;
@@ -242,35 +242,90 @@ const NIVEAU_BADGE = {
   manquant: ["À prouver", "attention"],
 };
 
+// Fiabilité (QUAY 0-3) → libellé court, pour le détail d'une citation.
+const QUAY_LIB = { 3: "prouvé par acte", 2: "déclaré", 1: "estimé", 0: "estimé" };
+
 export async function sectionPreuves(pid) {
   const carte = h("div", { class: "carte" }, h("h2", {}, "Preuves par fait"));
+  const corps = h("div", {});
+  carte.append(corps);
+  await rendrePreuves(corps, pid);
+  return carte;
+}
+
+// Corps de la table, re-rendu après chaque retrait (les index de citations
+// changent : on repart TOUJOURS de l'état serveur, jamais d'un index périmé).
+async function rendrePreuves(corps, pid) {
+  vider(corps);
   const pv = await apiGet("/api/individus/" + pid + "/preuves").catch(() => null);
-  if (!pv) { carte.append(h("div", { class: "vide compacte" }, "—")); return carte; }
-  carte.append(h("p", { class: "sous-titre" },
+  if (!pv) { corps.append(h("div", { class: "vide compacte" }, "—")); return; }
+  corps.append(h("p", { class: "sous-titre" },
     pv.prouves + " fait(s) sur " + pv.total + " prouvé(s) par acte. "
-    + "« Prouver » relie une source (existante ou créée sur place) à chaque fait."));
+    + "« Prouver » relie une source à chaque fait ; le nombre de sources se "
+    + "déplie pour voir ou retirer chaque preuve."));
   // Tableau léger à colonnes (Fait · Date · Preuve · action) : la date a sa
-  // propre colonne — plus de libellé sur deux lignes. La 5ᵉ piste (vide) porte
-  // le séparateur jusqu'au bord de la carte.
-  const lignes = pv.faits.map((f) => {
+  // propre colonne — plus de libellé sur deux lignes.
+  const tbody = h("tbody", {});
+  pv.faits.forEach((f) => {
     const [lib, genre] = NIVEAU_BADGE[f.niveau] || ["?", ""];
-    return h("tr", {},
+    const cits = f.citations || [];
+    // ligne de détail (repliée par défaut) : chaque citation, retirable
+    let detail = null, btnDeplier = null;
+    if (cits.length) {
+      const liste = h("div", { style: "padding:2px 0 6px" });
+      cits.forEach((c, i) => liste.append(ligneCitation(corps, pid, f, c, i)));
+      detail = h("tr", {}, h("td", { colspan: "4", style: "padding:0 10px" }, liste));
+      detail.style.display = "none";
+      btnDeplier = h("button", { class: "lien", style: "font-size:12px",
+        "aria-expanded": "false", title: "Voir / retirer les preuves attachées",
+        onclick: () => {
+          const ouvert = detail.style.display !== "none";
+          detail.style.display = ouvert ? "none" : "";
+          btnDeplier.textContent = (ouvert ? "▸ " : "▾ ") + cits.length + " source(s)";
+          btnDeplier.setAttribute("aria-expanded", String(!ouvert));
+        } }, "▸ " + cits.length + " source(s)");
+    }
+    tbody.append(h("tr", {},
       h("td", { class: "fait" }, f.libelle),
       h("td", { class: "date" }, f.date || "—"),
       h("td", { class: "preuve" },
-        h("span", { class: "rangee serre" },
-          badge(lib, genre),
-          f.nb_sources ? h("span", { class: "date" }, f.nb_sources + " source(s)") : null)),
+        h("span", { class: "rangee serre" }, badge(lib, genre), btnDeplier)),
       h("td", { class: "action" },
         h("button", { class: "bouton secondaire petit pousse",
-          onclick: () => prouver(pid, f.fait, f.libelle, "", { famille: f.famille }) }, "Prouver")));
+          onclick: () => prouver(pid, f.fait, f.libelle, "", { famille: f.famille }) }, "Prouver"))));
+    if (detail) tbody.append(detail);
   });
-  carte.append(h("table", { class: "preuves" },
+  corps.append(h("table", { class: "preuves" },
     h("thead", {}, h("tr", {},
       h("th", {}, "Fait"), h("th", {}, "Date"), h("th", { class: "preuve" }, "Preuve"),
       h("th", { class: "tete-action" }, "Action"))),
-    h("tbody", {}, lignes)));
-  return carte;
+    tbody));
+}
+
+// Une citation dépliée : titre de source (cliquable), page, fiabilité,
+// et « retirer cette preuve » (avec confirmation — la source, elle, reste).
+function ligneCitation(corps, pid, f, c, i) {
+  return h("div", { class: "rangee", style: "gap:8px;padding:3px 0;flex-wrap:wrap" },
+    actionnable(h("span", { class: "lien", style: c.source ? "cursor:pointer" : "",
+      title: c.source ? "Ouvrir la source" : "",
+      onclick: c.source ? () => aller("actes", { source: c.source }) : null },
+      "📄 " + (c.titre || "(source)"))),
+    c.page ? h("span", { style: "color:var(--gris);font-size:12.5px" }, c.page) : null,
+    c.quay != null
+      ? badge(QUAY_LIB[c.quay] || ("fiabilité " + c.quay), c.quay >= 3 ? "ok" : "info")
+      : null,
+    h("button", { class: "lien danger", style: "font-size:12px;margin-left:auto",
+      onclick: async () => {
+        if (!await confirmer("Retirer cette preuve du fait « " + f.libelle + " » ? "
+          + "La source elle-même n'est pas supprimée : seul le lien avec ce fait est défait.",
+          { titre: "Retirer la preuve", valider: "Retirer", danger: true })) return;
+        try {
+          await apiJson("/api/individus/" + pid + "/retirer-citation", "POST",
+            { fait: f.fait, index: i, famille: f.famille || "" });
+          toast("Preuve retirée. La source reste dans « Actes / Sources ».");
+          await rendrePreuves(corps, pid);
+        } catch (e) { toast(e.message, { type: "erreur" }); }
+      } }, "retirer cette preuve"));
 }
 
 // Prouver un fait = ouvrir LE formulaire de source détaillé (le même qu'Actes /

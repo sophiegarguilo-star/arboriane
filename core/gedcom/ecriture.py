@@ -142,7 +142,8 @@ def _ecrire_plac(lignes, niveau, lieu):
 def _ecrire_evenement(lignes, niveau, tag, ev):
     if not ev:
         return
-    if not (ev.get("date") or ev.get("lieu") or ev.get("cause") or ev.get("citations")):
+    if not (ev.get("date") or ev.get("lieu") or ev.get("cause")
+            or ev.get("note") or ev.get("citations")):
         return
     lignes.append(_ligne(niveau, tag))
     # Réémet la date républicaine d'origine si conservée (aller-retour fidèle),
@@ -159,6 +160,9 @@ def _ecrire_evenement(lignes, niveau, tag, ev):
     _ecrire_plac(lignes, niveau + 1, ev.get("lieu"))
     if ev.get("cause"):
         _ajouter(lignes, niveau + 1, "CAUS", ev["cause"])
+    # note de l'événement (GED-01) : relue par champs._evenement à l'import
+    if ev.get("note"):
+        _ecrire_note(lignes, niveau + 1, ev["note"])
     _ecrire_citations(lignes, niveau + 1, ev.get("citations"))
 
 def _ecrire_evt_generique(lignes, niveau, ev):
@@ -283,6 +287,16 @@ def exporter(donnees, nom_logiciel="Arboriane", avec_medias=True):
                 lignes.append(_ligne(2, "_PRIM", "Y"))
         for fc in ind.get("famc", []):
             lignes.append(_ligne(1, "FAMC", "@%s@" % fc))
+            # Type de filiation (MET-01) : fam["pedi"] = {enfant: type FR}.
+            # « adoption »→PEDI adopted, « accueil »→PEDI foster, « probable »
+            # →PEDI birth + STAT challenged (lien ni prouvé ni réfuté, norme
+            # 5.5.1). Absence de type = naissance : rien n'est écrit.
+            typ = ((donnees["familles"].get(fc) or {}).get("pedi")
+                   or {}).get(ident) or ""
+            if typ in PEDI_DEPUIS_FR:
+                lignes.append(_ligne(2, "PEDI", PEDI_DEPUIS_FR[typ]))
+                if typ == "probable":
+                    lignes.append(_ligne(2, "STAT", "challenged"))
         for fs in ind.get("fams", []):
             lignes.append(_ligne(1, "FAMS", "@%s@" % fs))
         # personnes associées (hors filiation) : ASSO @I@ / RELA <relation>

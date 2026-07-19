@@ -57,10 +57,18 @@ export async function vueRecherche(vue) {
   const zone = h("div", {});
   vue.append(compteur, zone);
 
+  // Rendu par tranches : afficher d'un bloc les 24 000 pistes d'un grand arbre
+  // gelait la page (155 000 nœuds DOM). Le serveur plafonne déjà chaque
+  // catégorie à 200 pistes ; ici on n'en montre que 100 à la fois, avec un
+  // bouton « Afficher 100 de plus » — le total réel reste annoncé.
+  const TRANCHE = 100;
+  let visibles = {};    // nom de catégorie -> nombre de pistes déroulées
+
   let dernier = null;   // dernier plan chargé (pour re-filtrer sans requête)
 
   async function charger() {
     vider(zone); compteur.textContent = "";
+    visibles = {};
     const url = "/api/plan?gen=" + profondeur + (reference ? "&id=" + reference : "");
     const p = await apiGet(url).catch(() => null);
     if (!p) { zone.append(h("div", { class: "vide" }, "Impossible d'établir le plan.")); return; }
@@ -75,24 +83,26 @@ export async function vueRecherche(vue) {
   }
 
   function rendre() {
-    vider(zone);
+    vider(zone); vider(compteur);
     if (!dernier || !dernier.total) {
       zone.append(h("div", { class: "vide" },
         h("span", { class: "grand" }, "🎉"),
         "Rien d'urgent à chercher : votre arbre est bien documenté !"));
-      compteur.textContent = "";
       return;
     }
     let cats = dernier.categories;
     if (filtreCat) cats = cats.filter((c) => c.nom === filtreCat);
     let affichees = 0;
     cats.forEach((cat) => {
+      // total RÉEL de la catégorie (le serveur peut n'en transporter que 200)
+      const totalCat = (cat.total != null) ? cat.total : cat.pistes.length;
       const pistes = filtrePrio ? cat.pistes.filter((p) => p.priorite >= filtrePrio) : cat.pistes;
       if (!pistes.length) return;
-      affichees += pistes.length;
+      const nVis = Math.min(visibles[cat.nom] || TRANCHE, pistes.length);
+      affichees += nVis;
       const carte = h("div", { class: "carte" });
-      carte.append(h("h2", {}, cat.nom + " ", badge(String(pistes.length))));
-      pistes.forEach((pi) => {
+      carte.append(h("h2", {}, cat.nom + " ", badge(totalCat + " au total", "info")));
+      pistes.slice(0, nVis).forEach((pi) => {
         const [lib, genre] = PRIO[pi.priorite] || ["", ""];
         carte.append(h("div", { style: "padding:8px 0;border-bottom:1px solid var(--bord)" },
           h("div", { class: "rangee serre" },
@@ -103,18 +113,35 @@ export async function vueRecherche(vue) {
           h("div", { class: "message" }, pi.pourquoi),
           pi.ou ? h("div", { style: "font-size:13px;color:var(--accent);margin-top:2px" }, "📍 " + pi.ou) : null));
       });
+      if (pistes.length > nVis) {
+        carte.append(h("div", { style: "padding-top:8px" },
+          h("button", {
+            class: "bouton secondaire petit",
+            onclick: () => { visibles[cat.nom] = nVis + TRANCHE; rendre(); },
+          }, "Afficher 100 de plus (" + (pistes.length - nVis) + " restantes)")));
+      } else if (totalCat > cat.pistes.length) {
+        carte.append(h("div", { class: "message", style: "padding-top:8px" },
+          "Les " + cat.pistes.length + " pistes les plus prioritaires sont affichées ("
+          + totalCat + " au total) — l'export CSV les contient toutes."));
+      }
       zone.append(carte);
     });
-    compteur.append(badge(affichees + " piste(s) affichée(s) sur " + dernier.total, "info"));
+    compteur.append(badge(affichees + " piste(s) affichée(s) — "
+      + dernier.total + " pistes au total", "info"));
     if (!affichees) zone.append(h("div", { class: "vide" }, "Aucune piste pour ce filtre."));
   }
 
   const PRIO_TXT = { 3: "Prioritaire", 2: "Utile", 1: "Plus tard" };
-  function exporterCsv() {
+  async function exporterCsv() {
     if (!dernier || !dernier.total) { return; }
+    // L'export reste COMPLET : on redemande le plan SANS plafond au serveur
+    // (l'affichage, lui, est limité à 200 pistes par catégorie).
+    const url = "/api/plan?gen=" + profondeur
+      + (reference ? "&id=" + reference : "") + "&limite=0";
+    const complet = (await apiGet(url).catch(() => null)) || dernier;
     const entete = ["Catégorie", "Priorité", "Personne", "À chercher", "Pourquoi", "Où"];
     const lignes = [];
-    dernier.categories.forEach((cat) => {
+    complet.categories.forEach((cat) => {
       const pistes = filtreCat && cat.nom !== filtreCat ? []
         : (filtrePrio ? cat.pistes.filter((p) => p.priorite >= filtrePrio) : cat.pistes);
       pistes.forEach((pi) => lignes.push(

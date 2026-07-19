@@ -5,11 +5,17 @@ import { h } from "../noyau/dom.js";
 const _actifs = new Set();
 
 export function toast(message, { duree = 3500, action = null, actionLabel = "",
-                                 persistant = false } = {}) {
+                                 persistant = false, type = "" } = {}) {
   if (_actifs.has(message)) return null;
   _actifs.add(message);
   const zone = document.getElementById("toasts");
-  const el = h("div", { class: "toast" }, h("span", {}, message));
+  // Une ERREUR ne doit pas ressembler à un succès (audit DES-01) : fond alerte,
+  // icône ⚠, lecture assertive, et elle reste affichée plus longtemps.
+  const erreur = type === "erreur";
+  if (erreur && duree === 3500) duree = 7000;
+  const el = h("div", { class: "toast" + (erreur ? " erreur" : ""),
+    role: erreur ? "alert" : "status" },
+    h("span", {}, (erreur ? "⚠ " : "") + message));
   const retirer = () => { el.remove(); _actifs.delete(message); };
   if (action) {
     el.append(h("button", { class: "toast-action",

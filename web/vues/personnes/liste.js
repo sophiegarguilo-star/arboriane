@@ -1,8 +1,9 @@
 // Personnes — vue liste (Ligne directe / Tout le monde / Par branche) :
 // recherche, filtres, tri, index A-Z.
-import { h, vider } from "../../noyau/dom.js";
+import { h, vider, actionnable } from "../../noyau/dom.js";
 import { aller } from "../../noyau/etat.js";
 import { apiGet } from "../../noyau/api.js";
+import { normaliser } from "../../noyau/texte.js";
 import { badge, pastilleSexe } from "../../composants/badge.js";
 import { SEXES, TRIS_PAR_MODE, modeleAnnee } from "./commun.js";
 import { ouvrirDoublons } from "./doublons.js";
@@ -119,11 +120,11 @@ export async function vueListe(vue) {
     majTri();
     vider(conteneur);
     conteneur.className = "liste-pers" + (compacte ? " compacte" : "");
-    const q = recherche.value.trim().toLowerCase();
+    const q = normaliser(recherche.value.trim());
     let base = mode === "directe" ? ancetres : liste;
     if (mode === "branche" && brancheFiltre) base = base.filter((p) => p.branche === brancheFiltre);
     let lst = base.filter((p) => {
-      if (q && !p.nom.toLowerCase().includes(q)) return false;
+      if (q && !normaliser(p.nom).includes(q)) return false;
       if (fSexe.value && p.sexe !== fSexe.value) return false;
       const an = annee(p);
       if (fAnMin.value && (!an || an < +fAnMin.value)) return false;
@@ -154,7 +155,7 @@ export async function vueListe(vue) {
       return;
     }
     lst.forEach((p, i) => {
-      const ligne = h("div", { class: "ligne-pers", "data-lettre": lettreDe(p),
+      const ligne = actionnable(h("div", { class: "ligne-pers", "data-lettre": lettreDe(p),
         onclick: () => aller("personnes", { fiche: p.id }) },
         (mode === "directe" && tri === "sosa") ? h("span", { class: "pers-num" }, String(p.sosa)) : null,
         (mode === "tous" && p.categorie)
@@ -165,7 +166,7 @@ export async function vueListe(vue) {
         h("span", { class: "meta" }, p.periode || ""),
         h("span", { style: "margin-left:auto" }),
         (mode !== "directe" && p.sosa != null) ? h("span", { class: "badge info" }, "Sosa " + p.sosa) : null,
-        (!p.identifie || !annee(p)) ? h("span", { class: "pt-alerte", title: "à compléter" }, "•") : null);
+        (!p.identifie || !annee(p)) ? h("span", { class: "pt-alerte", title: "à compléter" }, "•") : null));
       conteneur.append(ligne);
     });
     // index alphabétique (seulement en tri par nom)
@@ -179,11 +180,11 @@ export async function vueListe(vue) {
     const presentes = new Set(lst.map(lettreDe));
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach((L) => {
       const on = presentes.has(L);
-      azIndex.append(h("span", { class: "az-l" + (on ? "" : " absent"),
+      azIndex.append(actionnable(h("span", { class: "az-l" + (on ? "" : " absent"),
         onclick: on ? () => {
           const cible = conteneur.querySelector('[data-lettre="' + L + '"]');
           if (cible) cible.scrollIntoView({ behavior: "smooth", block: "start" });
-        } : null }, L));
+        } : null }, L)));
     });
   }
 

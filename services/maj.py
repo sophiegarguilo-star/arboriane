@@ -25,6 +25,65 @@ PAGE = "https://sophiegarguilo-star.github.io/arboriane/"
 # Journal des nouveautés, du plus récent au plus ancien. À COMPLÉTER à chaque
 # version livrée (une entrée = ce que l'utilisateur gagne, en clair).
 NOTES = [
+    {
+        "version": "1.9.11",
+        "date": "2026-07-19",
+        "points": [
+            "Fiabilité : deux fenêtres d'Arboriane ne peuvent plus se mélanger (chacune son port).",
+            "Vos suppressions sont plus sûres : bouton « Annuler » pendant 10 s, et un identifiant supprimé n'est plus jamais réutilisé.",
+            "Adoption et famille d'accueil : le type de lien se note sur chaque enfant, s'affiche sur la fiche et voyage en GEDCOM (PEDI).",
+            "« Revenir en arrière » : les copies automatiques se restaurent depuis l'Espace de travail.",
+            "Les preuves d'un fait se déplient et se retirent une à une.",
+            "Recherche : les accents ne comptent plus (« genealogie » trouve « généalogie »).",
+            "Un message demande confirmation avant de quitter une saisie non enregistrée.",
+            "Import : bilan des informations non reprises, notes d'événements conservées, fusion beaucoup plus rapide.",
+            "Menu simplifié (optionnel, Réglages › Affichage) et info-bulles sur chaque onglet.",
+            "Accessibilité : navigation au clavier, contrastes et libellés de champs améliorés.",
+        ],
+    }, {"version": "1.9.10", "date": "2026-07-13", "points": [
+        "Bouton « ← Retour » cohérent sur tous les écrans : il revient "
+        "toujours à l'écran précédent (l'historique de navigation), jamais à "
+        "une destination figée.",
+        "Sosa, Parenté et Arbre retrouvent leurs réglages au retour — plus "
+        "besoin de tout re-sélectionner après un aller-retour.",
+        "Santé ouvre directement la source visée.",
+        "Nouveau : « Voir les sources » d'un dépôt d'archives.",
+        "Les personnes citées sur un lieu sont désormais cliquables.",
+    ]},
+    {"version": "1.9.9", "date": "2026-07-12", "points": [
+        "Transcription enregistrable directement depuis la visionneuse "
+        "(avec une coche ✓ quand c'est fait).",
+        "Types d'acte personnalisables : baptême, mariage religieux, "
+        "sépulture, et « Autre… » pour vos propres types.",
+        "Lecture des accents renforcée grâce à des tables internes — plus "
+        "de « � » dans les fichiers importés.",
+        "Import « J'ai déjà un arbre » corrigé pour les fichiers ANSI.",
+        "Avertissement si un fichier contient des caractères déjà perdus "
+        "(abîmés avant l'import, irrécupérables).",
+        "Détection des fichiers UTF-16 même sans BOM.",
+        "Le numéro de version s'affiche sous le logo.",
+    ]},
+    {"version": "1.9.8", "date": "2026-07-12", "points": [
+        "Livre éditable : préface et sections modifiables avant impression.",
+        "Nouveau livret d'ascendance par couple, génération par génération.",
+        "Nouvel onglet Explorateur : parcourez les fichiers de l'arbre "
+        "(scans, photos, documents) sans quitter Arboriane.",
+    ]},
+    {"version": "1.9.7", "date": "2026-07-12", "points": [
+        "Accents des fichiers ANSI fiabilisés dans l'application installée "
+        "(codecs embarqués dans l'exe + repli sûr).",
+        "Un journal d'encodage (journal_encodage.log) est écrit à chaque "
+        "import : en cas de doute sur les accents, il dit ce qui a été "
+        "détecté et décidé.",
+        "Correction du réglage de géocodage.",
+    ]},
+    {"version": "1.9.6", "date": "2026-07-12", "points": [
+        "Import GEDCOM : les scans cités par les sources (chemin local sur "
+        "votre disque) sont copiés dans l'arbre à l'import — plus besoin de "
+        "les rejoindre un par un.",
+        "Les scans introuvables (disque absent, fichier déplacé) sont "
+        "signalés clairement.",
+    ]},
     {"version": "1.9.5", "date": "2026-07-12", "points": [
         "Import GEDCOM ANSI : correction d'un cas où un seul caractère non "
         "reconnu suffisait à casser TOUS les accents du fichier (ils "

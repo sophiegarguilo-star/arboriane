@@ -19,6 +19,7 @@ logique éprouvée de v1, et la fusion de lieux ne touche QUE la chaîne de lieu
 import unicodedata
 
 from core import modele
+from core.validation import ErreurValidation
 from services import fusion
 
 
@@ -69,6 +70,11 @@ def score_paire(donnees, ida, idb):
         score += 8; indices.append("même lieu de naissance")
     if _lieu(a.get("deces")) and _lieu(a.get("deces")) == _lieu(b.get("deces")):
         score += 5
+
+    # ligne directe (parent/enfant, aïeul…) : quasi certainement des homonymes,
+    # et la fusion serait de toute façon refusée (cycle de filiation).
+    if fusion.en_ligne_directe(donnees, ida, idb):
+        score -= 60; indices.append("⚠ en ligne directe")
 
     return max(0, min(100, score)), indices
 
@@ -145,6 +151,13 @@ def fusionner_assiste(base, garde_id, absorbe_id, choix=None, forcer_sexe=False)
     if sg != "U" and sa != "U" and sg != sa and not forcer_sexe:
         raise ValueError("Les deux personnes ont des sexes différents "
                          "(%s vs %s). Confirmez si c'est bien un doublon." % (sg, sa))
+    # Garde anti-cycle AVANT d'appliquer les choix : sinon la fiche gardée
+    # serait modifiée alors que la fusion sera refusée par services.fusion.
+    if fusion.en_ligne_directe(base.donnees, garde_id, absorbe_id):
+        raise ErreurValidation(
+            "Fusion refusée : « %s » et « %s » sont en ligne directe (l'une "
+            "est l'ancêtre de l'autre). Les fusionner créerait un cycle de "
+            "filiation." % (modele.nom_complet(g), modele.nom_complet(a)))
     for cle, qui in (choix or {}).items():
         if qui == "b":
             _poser(g, cle, _val(a, cle))
