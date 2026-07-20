@@ -311,13 +311,18 @@ function reperesDeVie(f, pid) {
     const pac = pacsDe(u), pacFin = pacsFinDe(u);
     const marie = u.mariage && (u.mariage.date || u.mariage.lieu);
     return [
-      // couple marié → « Union » ; couple pacsé/union libre sans mariage → « PACS »
+      // PACS / union libre : affiché DÈS QU'IL existe — même si le couple s'est
+      // marié ensuite (sinon « PACS puis mariage » perdait le PACS en synthèse).
+      pac
+        ? repere("🤝", "PACS / union libre", u.conjoint.nom
+            + (pac.date ? " · depuis " + pac.date : "")
+            + (pacFin && pacFin.date ? " → dissous " + pacFin.date : " · en cours"))
+        : null,
+      // Mariage → « Union » ; couple avec conjoint mais ni PACS ni mariage → « Union » simple.
       (marie || !pac)
         ? repere("💍", "Union", u.conjoint.nom
             + (marie ? " · " + [u.mariage.date, u.mariage.lieu].filter(Boolean).join(" à ") : ""))
-        : repere("🤝", "PACS / union libre", u.conjoint.nom
-            + (pac.date ? " · depuis " + pac.date : "")
-            + (pacFin && pacFin.date ? " → dissous " + pacFin.date : " · en cours")),
+        : null,
       dv && (dv.date || dv.lieu)
         ? repere("💔", "Divorce", "d'avec " + u.conjoint.nom + " · "
             + [dv.date, dv.lieu].filter(Boolean).join(" à ")) : null,
