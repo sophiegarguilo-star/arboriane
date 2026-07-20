@@ -289,6 +289,10 @@ async function prouver(pid, fait, libelle, nom, extra = {}) {
 const CARNET_LIB = { seance: "Séance", piste: "Piste", trouvaille: "Trouvaille",
   reflexion: "Réflexion", afaire: "À faire", ia: "IA" };
 const CARNET_GENRE = { piste: "info", trouvaille: "ok", afaire: "attention" };
+// Types proposés à l'écriture depuis la fiche (« ia » réservé aux notes
+// générées). « reflexion » par défaut : seuls piste/afaire alimentent le plan
+// de recherche, on évite d'y verser une simple note.
+const CARNET_TYPES_FICHE = ["reflexion", "trouvaille", "piste", "afaire", "seance"];
 
 // Section « Mentions du carnet » — les notes du carnet de bord qui taguent cette
 // personne (pistes, trouvailles, réflexions…). Fait le pont carnet ↔ fiche : une
@@ -311,6 +315,63 @@ export async function sectionCarnet(pid) {
   carte.append(h("button", { class: "lien", style: "font-size:12px;margin-top:8px",
     onclick: () => aller("carnet") }, "Ouvrir le carnet →"));
   return carte;
+}
+
+// Onglet « Carnet » de la fiche : un formulaire pour ÉCRIRE une note (reliée à
+// cette personne) PUIS la liste des mentions. La note part dans le carnet de
+// bord (Carnet/carnet.json) et réapparaît ici et dans l'écran Carnet, car elle
+// tague `personnes:[pid]`. Aucun endpoint dédié : POST /api/carnet suffit.
+export async function ongletCarnet(pid) {
+  const box = h("div", {});
+  const zoneForm = h("div", {}), zoneListe = h("div", {});
+  box.append(zoneForm, zoneListe);
+  const champ = (lib, ctrl) => h("div", { class: "champ", style: "margin:.4rem 0" },
+    h("label", {}, lib), ctrl);
+
+  async function rechargerListe() {
+    vider(zoneListe);
+    zoneListe.append((await sectionCarnet(pid))
+      || h("div", { class: "vide" }, "Aucune note du carnet ne cite cette personne."));
+  }
+  function fermerForm() {
+    vider(zoneForm);
+    zoneForm.append(h("button", { class: "bouton", onclick: ouvrirForm },
+      "✍️ Écrire une note au carnet"));
+  }
+  function ouvrirForm() {
+    vider(zoneForm);
+    const type = h("select", {});
+    CARNET_TYPES_FICHE.forEach((t) => type.append(h("option",
+      Object.assign({ value: t }, t === "reflexion" ? { selected: true } : {}),
+      CARNET_LIB[t] || t)));
+    const titre = h("input", { placeholder: "Titre (ex. « Vérifier l'acte de mariage »)", style: "width:100%" });
+    const texte = h("textarea", { rows: "4", placeholder: "Votre note…", style: "width:100%" });
+    let enCours = false;
+    zoneForm.append(h("div", { class: "carte" },
+      h("h2", { style: "margin-top:0" }, "✍️ Nouvelle note du carnet"),
+      h("p", { class: "sous-titre" },
+        "Ajoutée à votre carnet de bord et reliée à cette personne."),
+      champ("Type", type), champ("Titre", titre), champ("Note", texte),
+      h("div", { class: "barre-actions", style: "margin-top:.6rem" },
+        h("button", { class: "bouton", onclick: async () => {
+          if (enCours) return;
+          if (!titre.value.trim() && !texte.value.trim()) {
+            toast("Écrivez au moins un titre ou un texte."); return;
+          }
+          enCours = true;
+          try {
+            await apiJson("/api/carnet", "POST", { type: type.value,
+              titre: titre.value.trim(), texte: texte.value.trim(), personnes: [pid] });
+            toast("Note ajoutée au carnet.");
+            fermerForm(); rechargerListe();
+          } catch (e) { toast(e.message, { type: "erreur" }); enCours = false; }
+        } }, "Enregistrer dans le carnet"),
+        h("button", { class: "bouton secondaire", onclick: fermerForm }, "Annuler"))));
+  }
+
+  fermerForm();
+  await rechargerListe();
+  return box;
 }
 
 export function sectionPhotos(pid, f) {

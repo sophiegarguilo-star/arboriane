@@ -12,7 +12,7 @@ import { RESN_LABEL, TYPE_NOM_LABEL, majuscule, brancheDeSosa,
          initiale, ligneDef } from "./commun.js";
 import { imprimerFiche } from "./impression.js";
 import { sectionChronologie, sectionPistes, sectionDocuments, sectionPreuves,
-         sectionCarnet, sectionPhotos } from "./fiche_sections.js";
+         ongletCarnet, sectionPhotos } from "./fiche_sections.js";
 
 // Ajout d'un proche : on ouvre le FORMULAIRE COMPLET unifié (« Nouvelle
 // personne ») avec un lien de parenté pré-rempli. `type` ∈ pere | mere |
@@ -211,8 +211,7 @@ export async function vueFiche(vue, pid, ongletInitial) {
     ["sources", "Sources & preuves", () => panneauSources(f, pid)],
     // « Recherche web » désactivé pour l'instant (code conservé : blocLiensWeb) ;
     // remplacé par un onglet « Carnet » = les notes du carnet qui citent la personne.
-    ["carnet", "Carnet", async () => (await sectionCarnet(pid))
-      || h("div", { class: "vide" }, "Aucune note du carnet ne cite cette personne.")],
+    ["carnet", "Carnet", () => ongletCarnet(pid)],
     ["photos", "Photos", () => sectionPhotos(pid, f)],
     ["gedcom", "Données GEDCOM", () => donneesGedcom(f)],
   ];
