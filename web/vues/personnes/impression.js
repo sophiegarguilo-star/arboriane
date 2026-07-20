@@ -66,20 +66,29 @@ export async function imprimerFiche(f, pid) {
     if (!u.conjoint) return;
     const pac = pacsDe(u), pacFin = pacsFinDe(u), dv = divorceDe(u);
     const marie = u.mariage && (u.mariage.date || u.mariage.lieu);
-    if (pac) reperesUnions.push(["PACS / union libre", u.conjoint.nom
+    if (pac) reperesUnions.push(["🤝", "PACS / union libre", u.conjoint.nom
       + (pac.date ? " · depuis " + pac.date : "")
       + (pacFin && pacFin.date ? " → dissous " + pacFin.date : " · en cours")]);
-    if (marie || !pac) reperesUnions.push(["Union", u.conjoint.nom
+    if (marie || !pac) reperesUnions.push(["💍", "Union", u.conjoint.nom
       + (marie ? " · " + [u.mariage.date, u.mariage.lieu].filter(Boolean).join(" à ") : "")]);
-    if (dv && (dv.date || dv.lieu)) reperesUnions.push(["Divorce",
+    if (dv && (dv.date || dv.lieu)) reperesUnions.push(["💔", "Divorce",
       "d'avec " + u.conjoint.nom + " · " + [dv.date, dv.lieu].filter(Boolean).join(" à ")]);
   });
-  sections.push('<section class="bloc"><h2>Repères de vie</h2>' + dl([
-    ["Naissance", [nais.date, nais.lieu].filter(Boolean).join(" à ")],
+  // Repères de vie avec pastilles emoji (comme à l'écran) plutôt qu'une simple
+  // liste : chaque repère = icône + libellé + valeur.
+  const repRows = [
+    ["✳️", "Naissance", [nais.date, nais.lieu].filter(Boolean).join(" à ")],
     ...reperesUnions,
-    ["Décès", [dec.date, dec.lieu].filter(Boolean).join(" à ") + (dec.cause ? " · cause : " + dec.cause : "")],
-    ["Profession", prof], ["Lieux de vie", lieuxVie.join(" · ")],
-  ]) + '</section>');
+    ["✝️", "Décès", [dec.date, dec.lieu].filter(Boolean).join(" à ") + (dec.cause ? " · cause : " + dec.cause : "")],
+    ["🛠️", "Profession", prof],
+    ["📍", "Lieux de vie", lieuxVie.join(" · ")],
+  ].filter(([, , v]) => v != null && String(v).trim() !== "");
+  sections.push('<section class="bloc"><h2>Repères de vie</h2>'
+    + (repRows.length ? repRows.map(([ico, k, v]) =>
+        '<div class="rep-row"><span class="rep-ico">' + ico + '</span>'
+        + '<div><div class="rep-k">' + e(k) + '</div><div>' + e(v) + '</div></div></div>').join("")
+      : '<p style="color:#8a857a">Repères à compléter.</p>')
+    + '</section>');
 
   // 4) Vie & chronologie
   const items = [];
@@ -180,6 +189,10 @@ export async function imprimerFiche(f, pid) {
     + "dt{color:#8a857a;font-size:8.6pt;text-transform:uppercase;letter-spacing:.04em;font-weight:600;align-self:start;padding-top:1px}"
     + "dd{margin:0}"
     + ".union{margin:7px 0}"
+    + ".rep-row{display:flex;gap:9px;align-items:flex-start;padding:4px 0}"
+    + ".rep-row+.rep-row{border-top:1px solid #f0ece1}"
+    + ".rep-ico{font-size:13pt;line-height:1.25;flex:none}"
+    + ".rep-k{color:#8a857a;font-size:8.4pt;text-transform:uppercase;letter-spacing:.04em;font-weight:600}"
     + "ul.chrono{list-style:none;padding:0;margin:2px 0 0}"
     + "ul.chrono li{display:flex;align-items:flex-start;gap:10px;padding:5px 0}"
     + "ul.chrono li+li{border-top:1px solid #f0ece1}"
