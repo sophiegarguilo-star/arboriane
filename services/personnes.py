@@ -221,7 +221,11 @@ def resume_de_vie(base, ind):
                  else fam.get("mari"))
         mar = fam.get("mariage") or {}
         nom_autre = modele.nom_complet(inds.get(autre) or {}) if autre else ""
-        if nom_autre or mar.get("date") or mar.get("lieu"):
+        marie = mar.get("date") or mar.get("lieu")
+        pacs = next((e for e in (fam.get("evenements") or [])
+                     if e.get("type") == "EVEN"
+                     and (e.get("precision") or "") == "PACS"), None)
+        if marie:                            # mariage (date ou lieu enregistré)
             morceau = "marié" + accord
             an_m = modele.annee(mar.get("date"))
             if an_m:
@@ -231,6 +235,16 @@ def resume_de_vie(base, ind):
             if nom_autre:
                 morceau += " avec %s" % nom_autre
             bouts.append(morceau)
+        elif pacs:                           # PACS sans mariage → ne pas dire « marié·e »
+            morceau = "pacsé" + accord
+            an_p = modele.annee(pacs.get("date"))
+            if an_p:
+                morceau += " en %d" % an_p
+            if nom_autre:
+                morceau += " avec %s" % nom_autre
+            bouts.append(morceau)
+        elif nom_autre:                      # conjoint·e connu·e, ni mariage ni PACS
+            bouts.append("en couple avec %s" % nom_autre)
         divorce = next((e for e in (fam.get("evenements") or [])
                         if e.get("type") == "DIV"), None)
         if divorce and (divorce.get("date") or divorce.get("lieu")):
