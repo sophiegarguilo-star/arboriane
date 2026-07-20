@@ -56,11 +56,27 @@ export async function imprimerFiche(f, pid) {
   const lieuxVie = []; const vus = new Set();
   [(nais.lieu), ...(f.residences || []).map((r) => r.lieu), ...(f.evenements || []).map((ev) => ev.lieu), dec.lieu]
     .forEach((l) => { l = (l || "").trim(); if (l && !vus.has(l.toLowerCase())) { vus.add(l.toLowerCase()); lieuxVie.push(l); } });
-  const union0 = f.unions[0];
+  // Unions : distinguer PACS / mariage / union libre, et les afficher TOUTES
+  // (même logique que la fiche à l'écran) — pas seulement la première.
+  const pacsDe = (u) => (u.evenements || []).find((x) => x && x.type === "EVEN" && (x.precision || "") === "PACS");
+  const pacsFinDe = (u) => (u.evenements || []).find((x) => x && x.type === "EVEN" && (x.precision || "").startsWith("Dissolution de PACS"));
+  const divorceDe = (u) => (u.evenements || []).find((x) => x && x.type === "DIV");
+  const reperesUnions = [];
+  (f.unions || []).forEach((u) => {
+    if (!u.conjoint) return;
+    const pac = pacsDe(u), pacFin = pacsFinDe(u), dv = divorceDe(u);
+    const marie = u.mariage && (u.mariage.date || u.mariage.lieu);
+    if (pac) reperesUnions.push(["PACS / union libre", u.conjoint.nom
+      + (pac.date ? " · depuis " + pac.date : "")
+      + (pacFin && pacFin.date ? " → dissous " + pacFin.date : " · en cours")]);
+    if (marie || !pac) reperesUnions.push(["Union", u.conjoint.nom
+      + (marie ? " · " + [u.mariage.date, u.mariage.lieu].filter(Boolean).join(" à ") : "")]);
+    if (dv && (dv.date || dv.lieu)) reperesUnions.push(["Divorce",
+      "d'avec " + u.conjoint.nom + " · " + [dv.date, dv.lieu].filter(Boolean).join(" à ")]);
+  });
   sections.push('<section class="bloc"><h2>Repères de vie</h2>' + dl([
     ["Naissance", [nais.date, nais.lieu].filter(Boolean).join(" à ")],
-    ["Union", union0 && union0.conjoint ? union0.conjoint.nom
-      + (union0.mariage && (union0.mariage.date || union0.mariage.lieu) ? " · " + [union0.mariage.date, union0.mariage.lieu].filter(Boolean).join(" à ") : "") : ""],
+    ...reperesUnions,
     ["Décès", [dec.date, dec.lieu].filter(Boolean).join(" à ") + (dec.cause ? " · cause : " + dec.cause : "")],
     ["Profession", prof], ["Lieux de vie", lieuxVie.join(" · ")],
   ]) + '</section>');
@@ -68,7 +84,20 @@ export async function imprimerFiche(f, pid) {
   // 4) Vie & chronologie
   const items = [];
   if (nais.date || nais.lieu) items.push({ an: modeleAnnee(nais.date), typ: "nais", lib: "Naissance", txt: [nais.date, nais.lieu].filter(Boolean).join(" à ") });
-  (f.unions || []).forEach((u) => { const m = u.mariage || {}; if (m.date || m.lieu || u.conjoint) items.push({ an: modeleAnnee(m.date), typ: "union", lib: "Mariage", txt: (u.conjoint ? "avec " + u.conjoint.nom : "") + ((m.date || m.lieu) ? " — " + [m.date, m.lieu].filter(Boolean).join(" à ") : "") }); });
+  (f.unions || []).forEach((u) => {
+    const m = u.mariage || {}, nom = u.conjoint ? u.conjoint.nom : "", evs = u.evenements || [];
+    if (m.date || m.lieu) items.push({ an: modeleAnnee(m.date), typ: "union", lib: "Mariage",
+      txt: (nom ? "avec " + nom : "") + ((m.date || m.lieu) ? " — " + [m.date, m.lieu].filter(Boolean).join(" à ") : "") });
+    evs.forEach((ev) => {
+      const lib = ev.type === "DIV" ? "Divorce" : ev.type === "ENGA" ? "Fiançailles"
+        : ev.type === "EVEN" ? (ev.precision || "Union") : (EVT_LABEL[ev.type] || ev.type);
+      const pre = nom ? (ev.type === "DIV" ? "d'avec " + nom : "avec " + nom) : "";
+      items.push({ an: modeleAnnee(ev.date), typ: "union", lib,
+        txt: pre + ((ev.date || ev.lieu) ? (pre ? " — " : "") + [ev.date, ev.lieu].filter(Boolean).join(" à ") : "") });
+    });
+    if (nom && !(m.date || m.lieu) && !evs.length)
+      items.push({ an: null, typ: "union", lib: "Union", txt: "avec " + nom });
+  });
   (f.professions || []).forEach((p) => { if (p.valeur) items.push({ an: null, typ: "prof", lib: "Profession", txt: p.valeur }); });
   (f.residences || []).forEach((r) => { if (r.date || r.lieu) items.push({ an: modeleAnnee(r.date), typ: "resid", lib: "Résidence", txt: [r.date, r.lieu].filter(Boolean).join(" à ") }); });
   (f.evenements || []).forEach((ev) => items.push({ an: modeleAnnee(ev.date), typ: "evt", lib: EVT_LABEL[ev.type] || ev.type, txt: [ev.valeur, [ev.date, ev.lieu].filter(Boolean).join(" à ")].filter(Boolean).join(" — ") }));

@@ -2,12 +2,56 @@
 // Deux sous-vues : « Documents & actes » (avec pièces) et « Toutes les sources ».
 import { h, vider } from "../../noyau/dom.js";
 import { aller } from "../../noyau/etat.js";
-import { apiGet } from "../../noyau/api.js";
+import { apiGet, apiJson } from "../../noyau/api.js";
 import { badge } from "../../composants/badge.js";
+import { toast } from "../../composants/toast.js";
+import { ouvrirModale, fermerModale } from "../../composants/modale.js";
 import { STATUTS, STATUT_LABEL, FIAB, exportCsv } from "./commun.js";
 import { champPersonne } from "../../composants/champ.js";
 import { detail } from "./detail.js";
 import { formulaire } from "./formulaire.js";
+
+// « Ranger les pièces » : renomme les scans selon la nomenclature triable
+// (date de l'événement en tête), en gardant les citations intactes. Aperçu
+// d'abord (cases à cocher), puis application côté serveur (renomme + recite +
+// sauvegarde). Le TITRE affiché dans l'app ne change pas — seul le nom disque.
+async function ouvrirRangement() {
+  const { items } = await apiGet("/api/nomenclature/rangement").catch(() => ({ items: [] }));
+  if (!items || !items.length) {
+    toast("Toutes vos pièces sont déjà bien nommées 👍"); return;
+  }
+  const lignes = items.map((it) => {
+    it._chk = h("input", { type: "checkbox", checked: "checked" });
+    return h("label", { style: "display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--bord);font-size:13px" },
+      it._chk,
+      h("div", { style: "min-width:0" },
+        it.titre ? h("div", { style: "color:var(--gris-clair);font-size:12px" }, it.titre) : null,
+        h("div", { style: "word-break:break-all" },
+          h("span", { style: "color:var(--gris)" }, it.de), " → ", h("strong", {}, it.vers))));
+  });
+  const contenu = h("div", {},
+    h("p", { style: "margin-top:0;font-size:13px" },
+      "Renomme les scans avec un nom triable (date de l'événement en tête). "
+      + "Le titre dans l'application ne change pas, et le lien avec chaque source "
+      + "est conservé. Une sauvegarde est faite avant."),
+    h("div", { style: "max-height:50vh;overflow:auto" }, ...lignes),
+    h("div", { class: "barre-actions", style: "margin-top:12px" },
+      h("button", { class: "bouton", onclick: async (e) => {
+        const choisis = items.filter((it) => it._chk.checked)
+          .map((it) => ({ de: it.de, vers: it.vers }));
+        if (!choisis.length) { toast("Aucune pièce cochée."); return; }
+        e.target.disabled = true;
+        try {
+          const r = await apiJson("/api/nomenclature/rangement", "POST", { items: choisis });
+          const n = r.renommes.length, ig = (r.ignores || []).length;
+          toast(n + " pièce" + (n > 1 ? "s" : "") + " rangée" + (n > 1 ? "s" : "")
+            + (ig ? " · " + ig + " ignorée" + (ig > 1 ? "s" : "") : ""));
+          fermerModale(); aller("actes");
+        } catch (err) { toast(err.message, { type: "erreur" }); e.target.disabled = false; }
+      } }, "🗂️ Ranger les pièces cochées"),
+      h("button", { class: "bouton secondaire", onclick: fermerModale }, "Annuler")));
+  ouvrirModale(contenu, { titre: "Ranger les pièces (" + items.length + ")", largeur: 640 });
+}
 
 let sousVue = "documents";     // documents | toutes
 let filtres = { q: "", type: "", statut: "", personne: "", depot: "", orphelins: false, tri: "date" };
@@ -49,6 +93,8 @@ export async function vueActes(vue, arg) {
   onglets.append(btn("documents", "🖼 Documents & actes"), btn("toutes", "📋 Toutes les sources"),
     h("span", { class: "pousse" }),
     h("button", { class: "bouton petit", onclick: () => formulaire(null) }, "➕ Nouvelle source"),
+    h("button", { class: "bouton secondaire petit", onclick: ouvrirRangement,
+      title: "Renommer les scans avec un nom de fichier triable (date en tête)" }, "🗂️ Ranger les pièces"),
     h("button", { class: "bouton secondaire petit", onclick: () => exportCsv(data.sources) }, "⬇ CSV"));
   vue.append(onglets);
 

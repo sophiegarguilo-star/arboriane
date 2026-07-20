@@ -171,3 +171,68 @@ def apercu(type_acte="", personnes=(), date="", lieu="", fichiers=(),
         renommes.append({"origine": f, "propose": nf})
     return {"titre": titre_suggere(type_acte, personnes, date, lieu),
             "fichiers": renommes}
+
+
+def _date_evenement(donnees, source):
+    """Date de l'ÉVÉNEMENT documenté par la source (naissance / décès / mariage),
+    pour nommer le fichier au plus près du sens : un acte de naissance se range
+    à la date de NAISSANCE, pas à la date où l'acte a été dressé. Renvoie '' si
+    indéterminable → l'appelant retombe alors sur la date de la source."""
+    typ = (source.get("type") or "").strip()
+    inds = donnees.get("individus", {})
+    gens = source.get("personnes") or []
+    ids = [p.get("id") for p in gens if p.get("id")]
+    principal = next((p.get("id") for p in gens
+                      if (p.get("role") or "").strip().lower()
+                      in ("sujet", "de cujus", "défunt", "defunt", "époux",
+                          "epoux", "épouse", "epouse")), None)
+    principal = principal or (ids[0] if ids else None)
+
+    def _fait(pid, champ):
+        return ((inds.get(pid) or {}).get(champ) or {}).get("date", "")
+
+    if typ == "Acte de naissance":
+        return _fait(principal, "naissance")
+    if typ in ("Acte de décès", "Pierre tombale / sépulture"):
+        return _fait(principal, "deces")
+    if typ in ("Acte de mariage", "Publication de mariage"):
+        autres = [i for i in ids if i != principal]
+        for f in donnees.get("familles", {}).values():
+            couple = {f.get("mari"), f.get("epouse")}
+            if principal in couple and (not autres or any(a in couple for a in autres)):
+                d = (f.get("mariage") or {}).get("date", "")
+                if d:
+                    return d
+    return ""
+
+
+def plan(donnees):
+    """Aperçu du rangement (LECTURE SEULE) : pour chaque scan cité par une
+    source, le nom de fichier proposé par la nomenclature s'il DIFFÈRE de
+    l'actuel. La date employée est celle de l'ÉVÉNEMENT (défaut : la date de la
+    source). Renvoie [{source, titre, de, vers}] (les fichiers déjà bien nommés
+    sont omis). Aucune collision : `existants` protège les autres fichiers."""
+    sources = donnees.get("sources", {})
+    inds = donnees.get("individus", {})
+    occupes = {f for s in sources.values() for f in (s.get("fichiers") or [])}
+    assignes = set()
+    items = []
+    for sid in sorted(sources):
+        s = sources[sid]
+        fichiers = s.get("fichiers") or []
+        if not fichiers:
+            continue
+        personnes = [{"nom": (inds.get(p.get("id")) or {}).get("nom", ""),
+                      "prenoms": (inds.get(p.get("id")) or {}).get("prenoms", "")}
+                     for p in (s.get("personnes") or []) if p.get("id")]
+        date = _date_evenement(donnees, s) or s.get("date", "")
+        total = len(fichiers)
+        for i, f in enumerate(fichiers):
+            existants = (occupes | assignes) - {f}
+            vers = nom_fichier(f, s.get("type", ""), personnes, date,
+                               s.get("lieu", ""), existants=existants, rang=i, total=total)
+            assignes.add(vers)
+            if vers != f:
+                items.append({"source": sid, "titre": s.get("titre") or "",
+                              "de": f, "vers": vers})
+    return items

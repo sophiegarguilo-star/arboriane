@@ -447,6 +447,37 @@ class Application:
         os.rename(source, cible)
         return os.path.basename(cible)
 
+    def ranger_pieces(self, items):
+        """Renomme des scans (Sources/) selon la nomenclature ET met à jour les
+        citations qui les référencent. Atomique PAR FICHIER : chaque scan est
+        renommé, ses citations recorrigées, puis l'arbre sauvegardé — un échec en
+        cours (fichier ouvert ailleurs…) laisse donc les précédents cohérents et
+        n'abîme pas les autres. Une copie horodatée est faite AVANT toute action.
+        `items` = [{de, vers}]. Renvoie {renommes:[{de,vers}], ignores:[{de,raison}]}."""
+        if not self.base:
+            raise ValueError("Aucun arbre ouvert.")
+        self.base.sauvegarder(forcer_horodatage=True)      # point de restauration
+        renommes, ignores = [], []
+        sources = self.base.donnees.get("sources", {})
+        for it in items or []:
+            de = (it.get("de") or "").strip()
+            vers = (it.get("vers") or "").strip()
+            if not de or not vers or de == vers:
+                continue
+            try:
+                final = self.renommer_media("Sources", de, vers)
+            except Exception as e:                          # noqa: BLE001
+                ignores.append({"de": de, "raison": str(e)})
+                continue
+            for s in sources.values():                      # repointer TOUTES les citations
+                if s.get("fichiers"):
+                    s["fichiers"] = [final if f == de else f for f in s["fichiers"]]
+                if s.get("fichier") == de:
+                    s["fichier"] = final
+            self.base.sauvegarder()
+            renommes.append({"de": de, "vers": final})
+        return {"renommes": renommes, "ignores": ignores}
+
     def lister_medias(self, categorie):
         """Noms des fichiers déjà présents dans une catégorie (Sources, Photos…).
         Sert à proposer un nom de scan qui n'entre en collision avec rien."""

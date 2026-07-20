@@ -5,6 +5,13 @@ vit dans services/nomenclature.py — un seul endroit, testable."""
 
 from routes import route
 from services import nomenclature as nm
+from core.validation import ErreurValidation
+
+
+def _base(app):
+    if not app.base:
+        raise ErreurValidation("Aucun arbre ouvert.")
+    return app.base
 
 
 def _personnes(app, ids):
@@ -29,3 +36,20 @@ def proposer(app, params, corps):
         lieu=corps.get("lieu", ""),
         fichiers=corps.get("fichiers") or [],
         existants=app.lister_medias("Sources"))
+
+
+@route("GET", r"^/api/nomenclature/rangement$")
+def rangement_apercu(app, params, corps):
+    """Aperçu (lecture seule) : les scans à renommer selon la nomenclature."""
+    return {"items": nm.plan(_base(app).donnees)}
+
+
+@route("POST", r"^/api/nomenclature/rangement$")
+def rangement_appliquer(app, params, corps):
+    """Applique le rangement : renomme les scans + met à jour les citations.
+    `items` (facultatif) restreint aux entrées choisies ; sinon tout le plan."""
+    _base(app)
+    items = corps.get("items")
+    if items is None:
+        items = nm.plan(app.base.donnees)
+    return app.ranger_pieces(items)
