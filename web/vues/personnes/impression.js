@@ -4,11 +4,12 @@ import { apiGet } from "../../noyau/api.js";
 import { toast } from "../../composants/toast.js";
 import { brancheDeSosa, majuscule, modeleAnnee, RESN_LABEL, EVT_LABEL } from "./commun.js";
 
-export async function imprimerFiche(f, pid) {
+export async function imprimerFiche(f, pid, choix) {
   const pv = await apiGet("/api/individus/" + pid + "/preuves").catch(() => null);
   const org = window.location.origin;
   const e = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const sections = [];
+  const veut = (k) => !choix || !!choix[k];   // choix absent ⇒ tout imprimer
 
   // 1) En-tête
   const princ = (f.medias || []).find((m) => m.principale) || (f.medias || [])[0];
@@ -39,8 +40,8 @@ export async function imprimerFiche(f, pid) {
     return rows ? '<dl>' + rows + '</dl>' : '';
   };
   const variantes = (f.noms_alternatifs || []).map((v) => [v.prenoms, v.nom].filter(Boolean).join(" ")).filter(Boolean).join(" · ");
-  sections.push('<h2 class="grp">Synthèse</h2>');
-  sections.push('<section class="bloc"><h2>Identité</h2>' + dl([
+  if (veut("identite") || veut("reperes")) sections.push('<h2 class="grp">Synthèse</h2>');
+  if (veut("identite")) sections.push('<section class="bloc"><h2>Identité</h2>' + dl([
     ["Nom de référence", f.nom], ["Prénoms", f.prenoms], ["Prénom usuel", f.prenom_principal],
     ["Préfixe", f.nom_prefixe], ["Suffixe", f.nom_suffixe],
     ["Surnom", f.surnom ? "« " + f.surnom + " »" : ""], ["Nom marital", f.nom_marital],
@@ -83,7 +84,7 @@ export async function imprimerFiche(f, pid) {
     ["🛠️", "Profession", prof],
     ["📍", "Lieux de vie", lieuxVie.join(" · ")],
   ].filter(([, , v]) => v != null && String(v).trim() !== "");
-  sections.push('<section class="bloc"><h2>Repères de vie</h2>'
+  if (veut("reperes")) sections.push('<section class="bloc"><h2>Repères de vie</h2>'
     + (repRows.length ? repRows.map(([ico, k, v]) =>
         '<div class="rep-row"><span class="rep-ico">' + ico + '</span>'
         + '<div><div class="rep-k">' + e(k) + '</div><div>' + e(v) + '</div></div></div>').join("")
@@ -114,7 +115,7 @@ export async function imprimerFiche(f, pid) {
   items.sort((a, b) => (a.an || 9999) - (b.an || 9999));
   const DOT = { nais: ["#3d7a54", "✳"], union: ["#c2681f", "⚭"], deces: ["#55606b", "✝"],
     resid: ["#2d6a6a", "⌂"], prof: ["#8a5a2a", "⚒"], evt: ["#7a7a7a", "◆"] };
-  if (items.length) sections.push('<h2 class="grp">Vie &amp; chronologie</h2>'
+  if (veut("chrono") && items.length) sections.push('<h2 class="grp">Vie &amp; chronologie</h2>'
     + '<section class="bloc"><h2>Chronologie</h2><ul class="chrono">'
     + items.map((it) => { const d = DOT[it.typ] || ["#7a7a7a", "•"];
       return '<li><span class="dot" style="background:' + d[0] + '">' + d[1] + '</span>'
@@ -136,8 +137,10 @@ export async function imprimerFiche(f, pid) {
       + (u.conjoint ? e(u.conjoint.nom) : "conjoint·e inconnu·e")
       + (u.enfants.length ? '<br><i>Enfants :</i> ' + nomsListe(u.enfants) : "") + '</div>';
   });
-  sections.push('<h2 class="grp">Famille</h2>');
-  sections.push('<section class="bloc"><h2>Parenté</h2>' + famHtml + '</section>');
+  if (veut("famille")) {
+    sections.push('<h2 class="grp">Famille</h2>');
+    sections.push('<section class="bloc"><h2>Parenté</h2>' + famHtml + '</section>');
+  }
 
   // 6) Sources & preuves
   let src = "";
@@ -149,18 +152,18 @@ export async function imprimerFiche(f, pid) {
     src += '<p><b>Sources rattachées :</b></p><ul>' + f.sources_liees.map((s) =>
       '<li>' + e(s.titre) + (s.type ? " — " + e(s.type) : "") + (s.date ? " (" + e(s.date) + ")" : "") + (s.role ? " · " + e(s.role) : "") + '</li>').join("") + '</ul>';
   }
-  if (src) sections.push('<h2 class="grp">Sources &amp; preuves</h2>'
+  if (veut("sources") && src) sections.push('<h2 class="grp">Sources &amp; preuves</h2>'
     + '<section class="bloc"><h2>Actes &amp; preuves rattachés</h2>' + src + '</section>');
 
   // 7-8) Recherche & notes
   const pistes = (f.pistes || []).map((p) => (typeof p === "string" ? { texte: p } : p)).filter((p) => p.texte);
-  if (pistes.length || (f.note || "").trim()) sections.push('<h2 class="grp">Recherche &amp; notes</h2>');
-  if (pistes.length) sections.push('<section class="bloc"><h2>Pistes de recherche</h2><ul>'
+  if (veut("notes") && (pistes.length || (f.note || "").trim())) sections.push('<h2 class="grp">Recherche &amp; notes</h2>');
+  if (veut("notes") && pistes.length) sections.push('<section class="bloc"><h2>Pistes de recherche</h2><ul>'
     + pistes.map((p) => '<li>' + (p.faite ? "☑ " : "☐ ") + e(p.texte) + '</li>').join("") + '</ul></section>');
-  if ((f.note || "").trim()) sections.push('<section class="bloc"><h2>Note biographique</h2><p>' + e(f.note).replace(/\n/g, "<br>") + '</p></section>');
+  if (veut("notes") && (f.note || "").trim()) sections.push('<section class="bloc"><h2>Note biographique</h2><p>' + e(f.note).replace(/\n/g, "<br>") + '</p></section>');
 
   // 9) Photos
-  if ((f.medias || []).length) sections.push('<h2 class="grp">Photos</h2>'
+  if (veut("photos") && (f.medias || []).length) sections.push('<h2 class="grp">Photos</h2>'
     + '<section class="bloc"><h2>Portraits &amp; documents</h2><div class="photos">'
     + f.medias.map((m) => '<figure><img src="' + org + '/media/Photos/' + encodeURIComponent(m.fichier) + '"><figcaption>' + e(m.titre || "") + '</figcaption></figure>').join("") + '</div></section>');
 

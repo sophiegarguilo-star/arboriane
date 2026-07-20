@@ -5,7 +5,7 @@ import { aller, retour, peutRevenir } from "../../noyau/etat.js";
 import { apiGet, apiJson } from "../../noyau/api.js";
 import { badge, pastilleSexe } from "../../composants/badge.js";
 import { toast } from "../../composants/toast.js";
-import { confirmer } from "../../composants/modale.js";
+import { confirmer, ouvrirModale, fermerModale } from "../../composants/modale.js";
 import { noterRecent } from "../../noyau/recents.js";
 import { blocLiensWeb } from "../../composants/liensWeb.js";
 import { RESN_LABEL, TYPE_NOM_LABEL, majuscule, brancheDeSosa,
@@ -129,6 +129,38 @@ async function modifierUnion(pid, u, nom) {
     h("button", { class: "bouton secondaire", onclick: retour }, "Annuler")));
 }
 
+// Impression « à la carte » : une petite fenêtre pour cocher les sections à
+// inclure. Le nom/en-tête de la personne est toujours imprimé ; le reste est
+// optionnel. Passe le choix à imprimerFiche(f, pid, choix).
+function choisirImpression(f, pid) {
+  const SECTIONS = [
+    ["identite", "Identité"], ["reperes", "Repères de vie"],
+    ["chrono", "Vie & chronologie"], ["famille", "Famille"],
+    ["sources", "Sources & preuves"], ["notes", "Recherche & notes"],
+    ["photos", "Photos"],
+  ];
+  const cases = {};
+  const lignes = SECTIONS.map(([k, lib]) => {
+    const chk = h("input", { type: "checkbox", checked: "checked" });
+    cases[k] = chk;
+    return h("label", { style: "display:flex;gap:8px;align-items:center;padding:5px 0;cursor:pointer" }, chk, lib);
+  });
+  ouvrirModale(h("div", {},
+    h("p", { style: "margin-top:0;font-size:13px;color:var(--gris)" },
+      "Cochez les sections à inclure. Le nom de la personne est toujours imprimé."),
+    ...lignes,
+    h("div", { class: "barre-actions", style: "margin-top:12px" },
+      h("button", { class: "bouton", onclick: () => {
+        const choix = {};
+        SECTIONS.forEach(([k]) => { choix[k] = cases[k].checked; });
+        if (!Object.values(choix).some(Boolean)) { toast("Cochez au moins une section."); return; }
+        fermerModale();
+        imprimerFiche(f, pid, choix);
+      } }, "🖨 Imprimer"),
+      h("button", { class: "bouton secondaire", onclick: fermerModale }, "Annuler"))),
+    { titre: "Que voulez-vous imprimer ?", largeur: 420 });
+}
+
 export async function vueFiche(vue, pid, ongletInitial) {
   let f;
   try { f = await apiGet("/api/individus/" + pid); }
@@ -190,7 +222,7 @@ export async function vueFiche(vue, pid, ongletInitial) {
       onclick: () => peutRevenir() ? retour() : aller("personnes") }, "← Retour"),
     h("button", { class: "bouton secondaire petit", onclick: () => aller("arbre", { racine: pid }) }, "🌳 Arbre"),
     h("button", { class: "bouton secondaire petit", onclick: () => aller("sosa") }, "↑ Sosa"),
-    h("button", { class: "bouton secondaire petit", onclick: () => imprimerFiche(f, pid) }, "🖨 Imprimer"),
+    h("button", { class: "bouton secondaire petit", onclick: () => choisirImpression(f, pid) }, "🖨 Imprimer"),
     h("button", { class: "bouton petit", onclick: () => aller("personnes", { editer: pid }) }, "✏️ Modifier"),
     h("button", { class: "bouton danger petit",
       title: "Supprimer cette personne", "aria-label": "Supprimer cette personne",
