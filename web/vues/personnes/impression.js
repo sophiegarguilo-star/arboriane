@@ -116,7 +116,14 @@ export async function imprimerFiche(f, pid) {
   const nomsListe = (arr) => (arr || []).map((p) => e(p.nom) + (p.periode ? " (" + e(p.periode) + ")" : "")).join(", ");
   let famHtml = dl([["Parents", nomsListe([...f.peres, ...f.meres])], ["Frères et sœurs", nomsListe(f.fratrie)]]);
   (f.unions || []).forEach((u) => {
-    famHtml += '<div class="union"><b>Union' + (u.mariage && (u.mariage.date || u.mariage.lieu) ? " · " + e([u.mariage.date, u.mariage.lieu].filter(Boolean).join(" à ")) : "") + '</b> : '
+    const pac = pacsDe(u), pacFin = pacsFinDe(u);
+    const marie = u.mariage && (u.mariage.date || u.mariage.lieu);
+    let libelle;
+    if (marie) libelle = "Mariage · " + e([u.mariage.date, u.mariage.lieu].filter(Boolean).join(" à "));
+    else if (pac) libelle = "PACS" + (pac.date ? " · depuis " + e(pac.date) : "")
+      + (pacFin && pacFin.date ? " → dissous " + e(pacFin.date) : "");
+    else libelle = "Union";
+    famHtml += '<div class="union"><b>' + libelle + '</b> : '
       + (u.conjoint ? e(u.conjoint.nom) : "conjoint·e inconnu·e")
       + (u.enfants.length ? '<br><i>Enfants :</i> ' + nomsListe(u.enfants) : "") + '</div>';
   });
