@@ -153,7 +153,19 @@ export async function vueFormulaire(vue, { editer, lien } = {}) {
     valeurs: ind.professions || [],
     creerLigne(v) {
       const inp = h("input", { value: v.valeur || "", placeholder: "ex. cultivateur", style: "width:100%" });
-      return { element: inp, lire: () => inp.value.trim() ? { valeur: inp.value.trim() } : null };
+      const d = champDate(v.date || "");            // profession datable (comme les résidences)
+      return {
+        element: h("div", {}, h("div", { style: "margin-bottom:6px" }, inp), d.element),
+        lire() {
+          const valeur = inp.value.trim();
+          if (!valeur) return null;                  // le métier est la donnée primaire
+          const p = { valeur };
+          const date = d.valeur();
+          if (date) p.date = date;
+          if (v.citations) p.citations = v.citations; // ne pas perdre les preuves à l'édition
+          return p;
+        },
+      };
     },
   });
 

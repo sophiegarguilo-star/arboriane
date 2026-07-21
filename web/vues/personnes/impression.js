@@ -13,7 +13,7 @@ export async function imprimerFiche(f, pid, choix) {
 
   // 1) En-tête
   const princ = (f.medias || []).find((m) => m.principale) || (f.medias || [])[0];
-  const prof = (f.professions || []).map((p) => p.valeur).filter(Boolean).join(", ");
+  const prof = (f.professions || []).map((p) => p.valeur ? p.valeur + (p.date ? " (" + p.date + ")" : "") : "").filter(Boolean).join(", ");
   const branche = brancheDeSosa(f.sosa);
   const badges = [
     f.sosa ? "Sosa n° " + f.sosa + (f.sosa > 1 ? " · Ancêtre direct" : "") : "",
@@ -108,7 +108,7 @@ export async function imprimerFiche(f, pid, choix) {
     if (nom && !(m.date || m.lieu) && !evs.length)
       items.push({ an: null, typ: "union", lib: "Union", txt: "avec " + nom });
   });
-  (f.professions || []).forEach((p) => { if (p.valeur) items.push({ an: null, typ: "prof", lib: "Profession", txt: p.valeur }); });
+  (f.professions || []).forEach((p) => { if (p.valeur) items.push({ an: modeleAnnee(p.date), typ: "prof", lib: "Profession", txt: [p.valeur, p.date].filter(Boolean).join(" — ") }); });
   (f.residences || []).forEach((r) => { if (r.date || r.lieu) items.push({ an: modeleAnnee(r.date), typ: "resid", lib: "Résidence", txt: [r.date, r.lieu].filter(Boolean).join(" à ") }); });
   (f.evenements || []).forEach((ev) => items.push({ an: modeleAnnee(ev.date), typ: "evt", lib: EVT_LABEL[ev.type] || ev.type, txt: [ev.valeur, [ev.date, ev.lieu].filter(Boolean).join(" à ")].filter(Boolean).join(" — ") }));
   if (dec.date || dec.lieu) items.push({ an: modeleAnnee(dec.date), typ: "deces", lib: "Décès", txt: [dec.date, dec.lieu].filter(Boolean).join(" à ") });

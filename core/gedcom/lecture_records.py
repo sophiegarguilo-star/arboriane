@@ -95,7 +95,13 @@ def lire_indi(rec):
         elif tag == "OCCU":
             prof = _fusion_texte(enf).strip()
             if prof:
-                ind["professions"].append({"valeur": prof})
+                item = {"valeur": prof}
+                ev = _evenement(enf)            # lit un éventuel « 2 DATE » (rép. incluse)
+                if ev.get("date"):
+                    item["date"] = ev["date"]
+                if ev.get("date_rep"):
+                    item["date_rep"] = ev["date_rep"]
+                ind["professions"].append(item)
         elif tag == "RESI":
             res = _evenement(enf)
             t = _premier(enf, "TYPE")

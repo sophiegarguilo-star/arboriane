@@ -257,10 +257,17 @@ def exporter(donnees, nom_logiciel="Arboriane", avec_medias=True):
         for ev in ind.get("evenements", []):
             _ecrire_evt_generique(lignes, 1, ev)
         for prof in ind.get("professions", []):
-            # professions : [{valeur}] (schéma cible) ; tolère aussi une chaîne
-            libelle = prof.get("valeur", "").strip() if isinstance(prof, dict) else str(prof).strip()
-            if libelle:
-                lignes.append(_ligne(1, "OCCU", libelle))
+            # professions : [{valeur, date?}] — datables comme les résidences ;
+            # tolère aussi une simple chaîne (ancien format).
+            est_dict = isinstance(prof, dict)
+            libelle = prof.get("valeur", "").strip() if est_dict else str(prof).strip()
+            if not libelle:
+                continue
+            lignes.append(_ligne(1, "OCCU", libelle))   # OCCU porte sa valeur sur la ligne du tag
+            if est_dict and prof.get("date_rep"):        # date républicaine : aller-retour fidèle
+                lignes.append(_ligne(2, "DATE", prof["date_rep"]))
+            elif est_dict and prof.get("date"):
+                lignes.append(_ligne(2, "DATE", _date_gedcom(prof["date"])))
         for res in ind.get("residences", []):
             # NB : on n'exporte PAS le "type" de résidence (ex. "Domicile").
             # Aucun site ne l'exploite, et Geneanet le recrache en clair dans la

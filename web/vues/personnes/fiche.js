@@ -169,7 +169,7 @@ export async function vueFiche(vue, pid, ongletInitial) {
 
   const conjoints = f.unions.map((u) => u.conjoint).filter(Boolean);
   const enfants = f.unions.flatMap((u) => u.enfants);
-  const prof = (f.professions || []).map((p) => p.valeur).filter(Boolean).join(", ");
+  const prof = (f.professions || []).map((p) => p.valeur ? p.valeur + (p.date ? " (" + p.date + ")" : "") : "").filter(Boolean).join(", ");
   const branche = brancheDeSosa(f.sosa);
 
   // ── En-tête ────────────────────────────────────────────────────────────
@@ -364,7 +364,7 @@ function reperesDeVie(f, pid) {
     ...unionsRep,
     repere("✝️", "Décès", ([dec.date, dec.lieu].filter(Boolean).join(" à ")
       + (dec.cause ? " · cause : " + dec.cause : "")).trim() || null),
-    repere("🛠", "Profession", (f.professions || []).map((p) => p.valeur).filter(Boolean).join(", ") || null),
+    repere("🛠", "Profession", (f.professions || []).map((p) => p.valeur ? p.valeur + (p.date ? " (" + p.date + ")" : "") : "").filter(Boolean).join(", ") || null),
     lieuxVie.length ? h("div", { class: "repere" },
       h("span", { class: "repere-ico" }, "📍"),
       h("div", {}, h("div", { class: "repere-titre" }, "Lieux de vie"),

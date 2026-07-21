@@ -164,7 +164,7 @@ export async function vueArbre(vue, arg) {
           NIV[ft.niveau] || ""))) : null,
       ligneInfo("Naissance", [nais.date, nais.lieu].filter(Boolean).join(" à ")),
       ligneInfo("Décès", [dec.date, dec.lieu].filter(Boolean).join(" à ")),
-      ligneInfo("Profession", (f.professions || []).map((p) => p.valeur).filter(Boolean).join(", ")),
+      ligneInfo("Profession", (f.professions || []).map((p) => p.valeur ? p.valeur + (p.date ? " (" + p.date + ")" : "") : "").filter(Boolean).join(", ")),
       h("p", { class: "sous-titre", style: "margin:10px 0 2px" },
         "Cliquez un proche pour recentrer l'arbre sur lui."),
       groupe("Parents", [...f.peres, ...f.meres]),

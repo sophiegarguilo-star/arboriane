@@ -97,7 +97,7 @@ export function sectionChronologie(f) {
   // Faits secondaires : index DANS le tableau (pas l'ordre trié) = cible de preuve.
   (f.professions || []).forEach((p, i) => {
     if (p.valeur) items.push({ an: modeleAnnee(p.date), lib: "Profession",
-      fait: "profession:" + i, txt: p.valeur, preuve: preuveDe(p, srcMap) });
+      fait: "profession:" + i, txt: [p.valeur, p.date].filter(Boolean).join(" — "), preuve: preuveDe(p, srcMap) });
   });
   (f.residences || []).forEach((r, i) => {
     if (r.date || r.lieu) items.push({ an: modeleAnnee(r.date), lib: "Résidence",
