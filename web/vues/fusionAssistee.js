@@ -39,14 +39,30 @@ async function chargerPersonnes(zone) {
   }
   paires.forEach((p) => {
     const [lib, genre] = NIVEAU[p.niveau] || ["", ""];
-    zone.append(h("div", { class: "carte compacte" },
+    const carte = h("div", { class: "carte compacte" },
       h("div", { class: "rangee" },
         h("strong", {}, p.nom),
         badge(lib + " · " + p.score + "%", genre),
         h("span", { style: "color:var(--gris);font-size:12px" }, (p.indices || []).join(" · "))),
       h("div", { class: "barre-actions", style: "margin-top:8px" },
-        h("button", { class: "bouton petit", onclick: () => assistant(p) }, "Comparer & fusionner"))));
+        h("button", { class: "bouton petit", onclick: () => assistant(p) }, "Comparer & fusionner"),
+        h("button", { class: "bouton secondaire petit",
+          title: "Marquer que ces deux personnes sont distinctes — ne plus la proposer",
+          onclick: () => ecarterPaire(p, carte, zone) }, "Ce n'est pas un doublon")));
+    zone.append(carte);
   });
+}
+
+// Écarte une paire (« pas un doublon ») : elle ne sera plus jamais proposée.
+async function ecarterPaire(p, carte, zone) {
+  try {
+    await apiJson("/api/fusion/ecarter", "POST", { a: p.a, b: p.b });
+    carte.remove();
+    toast("Paire écartée : « " + p.nom + " » ne sera plus signalée en doublon.");
+    if (!zone.querySelector(".carte"))
+      zone.append(h("div", { class: "vide" },
+        h("span", { class: "grand" }, "🎉"), "Aucun doublon probable."));
+  } catch (e) { toast(e.message); }
 }
 
 async function assistant(p) {
@@ -91,6 +107,15 @@ async function assistant(p) {
     contenu.append(h("div", { class: "barre-actions", style: "margin-top:14px" },
       h("button", { class: "bouton", onclick: () => lancerFusion(idGarde, idAbs, choix, false) },
         "Fusionner"),
+      h("button", { class: "bouton secondaire",
+        title: "Ces deux personnes sont distinctes — ne plus proposer cette paire",
+        onclick: async () => {
+          try {
+            await apiJson("/api/fusion/ecarter", "POST", { a: c.a, b: c.b });
+            toast("Paire écartée : ne sera plus signalée en doublon.");
+            fermerVolet(); aller("fusion");
+          } catch (e) { toast(e.message); }
+        } }, "Ce n'est pas un doublon"),
       h("button", { class: "bouton secondaire", onclick: fermerVolet }, "Annuler")));
   }
   rendre();

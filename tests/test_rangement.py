@@ -54,6 +54,33 @@ def test_plan_utilise_la_date_de_l_evenement():
     verifie("un fichier déjà bien nommé n'est pas listé", nm.plan(donnees) == [])
 
 
+def test_nom_ignore_les_personnes_citees():
+    # Sur l'acte de naissance de Sophie, un ex-conjoint est cité en marge
+    # (rôle « cité ») : il ne doit PAS entrer dans le nom du fichier.
+    donnees = {
+        "individus": {
+            "I1": {"id": "I1", "nom": "GARGUILO", "prenoms": "Sophie",
+                   "naissance": {"date": "20/07/1984"}},
+            "I4": {"id": "I4", "nom": "CHETNIK", "prenoms": "Marcin"}},
+        "familles": {},
+        "sources": {"S1": {"id": "S1", "type": "Acte de naissance",
+                           "date": "20/07/1984", "lieu": "Marseille",
+                           "fichiers": ["scan.jpg"],
+                           "personnes": [{"id": "I1", "role": "sujet"},
+                                         {"id": "I4", "role": "cité"}]}},
+    }
+    items = nm.plan(donnees)
+    verifie("le nom n'utilise que le sujet (pas le cité)",
+            items and items[0]["vers"] == "1984-07-20_N_GARGUILO-Sophie_Marseille.jpg")
+    # Repli sans rôle : deux personnes sans rôle -> les deux (comportement d'avant)
+    for p in donnees["sources"]["S1"]["personnes"]:
+        p["role"] = ""
+    donnees["sources"]["S1"]["fichiers"] = ["scan.jpg"]
+    v = nm.plan(donnees)[0]["vers"]
+    verifie("sans rôle renseigné : repli sur toutes les personnes (%s)" % v,
+            "GARGUILO-Sophie" in v and "CHETNIK-Marcin" in v)
+
+
 def test_application_renomme_et_garde_la_citation():
     app = Application(tempfile.mkdtemp())
     app.ouvrir_demo(demo.generer)
@@ -89,6 +116,7 @@ def test_application_renomme_et_garde_la_citation():
 
 if __name__ == "__main__":
     for fn in (test_plan_utilise_la_date_de_l_evenement,
+               test_nom_ignore_les_personnes_citees,
                test_application_renomme_et_garde_la_citation):
         print(fn.__name__)
         fn()

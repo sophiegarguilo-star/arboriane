@@ -5,6 +5,7 @@ vit dans services/nomenclature.py — un seul endroit, testable."""
 
 from routes import route
 from services import nomenclature as nm
+from services import taxonomie_actes as tax
 from core.validation import ErreurValidation
 
 
@@ -42,6 +43,29 @@ def proposer(app, params, corps):
 def rangement_apercu(app, params, corps):
     """Aperçu (lecture seule) : les scans à renommer selon la nomenclature."""
     return {"items": nm.plan(_base(app).donnees)}
+
+
+@route("GET", r"^/api/nomenclature/taxonomie$")
+def taxonomie(app, params, corps):
+    """Arbre Famille → Sous-famille → Type (+ code) pour le sélecteur d'acte,
+    et les descripteurs orthogonaux (forme / complétude / visibilité)."""
+    return {"selecteur": tax.selecteur(), "formes": tax.FORMES,
+            "completude": tax.COMPLETUDE, "visibilite": tax.VISIBILITE}
+
+
+@route("GET", r"^/api/nomenclature/legende$")
+def legende(app, params, corps):
+    """La légende des codes (données + texte prêt à afficher)."""
+    return {"entrees": tax.legende(), "texte": tax.legende_texte()}
+
+
+@route("POST", r"^/api/nomenclature/legende$")
+def legende_ecrire(app, params, corps):
+    """Écrit Sources/_LEGENDE-codes.txt dans l'arbre actif."""
+    nom = _base(app) and app.ecrire_legende_codes(tax.legende_texte())
+    if not nom:
+        return (400, {"erreur": "Aucun arbre ouvert."})
+    return {"ok": True, "fichier": nom}
 
 
 @route("POST", r"^/api/nomenclature/rangement$")

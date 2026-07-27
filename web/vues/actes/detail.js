@@ -28,6 +28,7 @@ export async function detail(sid) {
   [["Type", s.type], ["Date", s.date], ["Lieu", s.lieu || s.ville],
    ["Dépôt", s.depot], ["Cote", s.cote], ["Page", s.page],
    ["Fiabilité", s.fiabilite], ["Statut", s.statut],
+   ["Forme", s.forme], ["Complétude", s.completude], ["Visibilité", s.visibilite],
    ["ARK / URL", s.ark]].forEach(([k, v]) => {
     if (v) meta.append(h("div", { class: "def-ligne" },
       h("span", { class: "def-cle" }, k),

@@ -223,18 +223,29 @@ def _sources_encore_citees(donnees):
 # EXPORT GEDCOM PUBLIC (fichier .ged dans Exports/)
 # ---------------------------------------------------------------------------
 
-def exporter_gedcom_public(app, options=None):
+def exporter_gedcom_public(app, options=None, profil=None,
+                           transcription_complete=True):
     """Prépare la base anonymisée puis écrit un .ged public dans Exports/.
 
-    Renvoie le chemin absolu du fichier écrit. La base d'origine est intacte.
+    `profil` (facultatif) optimise pour un site cible après anonymisation
+    (voir services.profils_export). Renvoie le chemin absolu du fichier écrit.
+    La base d'origine est intacte.
     """
     if not app.espace_chemin or not app.base:
         raise ValueError("Aucun arbre ouvert.")
     pub = preparer(app.base.donnees, options)
+    profils_export = None
+    if profil and profil != "generique":
+        from services import profils_export
+        pub = profils_export.appliquer_profil(pub, profil, transcription_complete)
     texte = gedcom.exporter(pub)
+    if profils_export is not None:   # ex. Geneanet : retrait des tags privés
+        texte = profils_export.nettoyer_texte(texte, profil)
     c = chemins(app.espace_chemin)
-    cible = dans(c["exports"], "%s_publication_%s.ged"
-                 % (nom_sur(app.manifeste.get("nom", "arbre")), horodatage()))
+    suffixe = ("_" + profil) if (profil and profil != "generique") else ""
+    cible = dans(c["exports"], "%s_publication%s_%s.ged"
+                 % (nom_sur(app.manifeste.get("nom", "arbre")), suffixe,
+                    horodatage()))
     with open(cible, "w", encoding="utf-8") as f:
         f.write(texte)
     return cible

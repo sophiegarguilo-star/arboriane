@@ -307,6 +307,17 @@ def exporter(donnees, nom_logiciel="Arboriane", avec_medias=True):
         for t in ind.get("tags", []):
             if t:
                 lignes.append(_ligne(1, "_TAG", t))
+        # liens web par personne : _WLNK (TITL = titre, NOTE = url). Champ
+        # normalement vide ; rempli par un profil d'export (ex. Ancestry, qui
+        # jette le WWW des sources mais conserve ce lien web au niveau personne).
+        for lw in ind.get("_liens_web", []):
+            url = (lw.get("url") or "").strip()
+            if not url:
+                continue
+            lignes.append(_ligne(1, "_WLNK"))
+            if (lw.get("titre") or "").strip():
+                _ajouter(lignes, 2, "TITL", lw["titre"].strip())
+            _ajouter(lignes, 2, "NOTE", url)
         # pistes de recherche : _TODO (tag Arboriane, repris par Gramps) -> portable
         for pi in ind.get("pistes", []):
             piste = (pi.get("texte") or "").strip()
@@ -383,7 +394,9 @@ def exporter(donnees, nom_logiciel="Arboriane", avec_medias=True):
         # champs propres à Arboriane (fiabilité/statut/page/ville/pays) : tags
         # privés « _ », relus à l'import → aller-retour sans perte du cœur « preuve ».
         for cle, tg in (("fiabilite", "_FIAB"), ("statut", "_STATUT"),
-                        ("page", "_PAGE"), ("ville", "_VILLE"), ("pays", "_PAYS")):
+                        ("page", "_PAGE"), ("ville", "_VILLE"), ("pays", "_PAYS"),
+                        ("forme", "_FORME"), ("completude", "_COMPL"),
+                        ("visibilite", "_VISI")):
             if (src.get(cle) or "").strip():
                 lignes.append(_ligne(1, tg, src[cle].strip()))
         dep = (src.get("depot") or "").strip()

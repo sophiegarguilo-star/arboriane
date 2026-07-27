@@ -41,6 +41,15 @@ CODES_TYPE = {
     "Document": "DOC",
 }
 
+# La taxonomie complète (10 familles / ~100 types) enrichit la table SANS écraser
+# les codes historiques : `setdefault` garde ceux déjà rangés chez l'utilisateur.
+try:
+    from services import taxonomie_actes as _tax
+    for _lib, _code in _tax.codes_par_type().items():
+        CODES_TYPE.setdefault(_lib, _code)
+except Exception:               # la nomenclature doit marcher même sans taxonomie
+    pass
+
 _MOIS_GED = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
              "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12}
 
@@ -87,9 +96,41 @@ def date_iso(date):
     return ""
 
 
+# Tout ce qui SUIT la commune dans un lieu et n'a rien à faire dans un nom de
+# fichier : lieu d'enregistrement (mairie, commissariat…), voie (rue, route,
+# avenue…) et mentions (décédé, domicilié, n°…). « Alger, décédé rue du Numide
+# n°7 » -> « Alger » ; « Ténès, Commissariat civil de la Mairie » -> « Ténès ».
+_APRES_COMMUNE = re.compile(
+    r"\s*\b(nella|nel|della|del|de\s+la|di|au|à\s+la)?\s*"
+    r"(commissariat|mairie|bureau\s+municipal|bureau\s+de\s+l|maison\s+commune|"
+    r"casa\s+comunale|casa\s+municipale|comune|paroisse|[ée]glise|chiesa|"
+    r"annexe|[ée]tat[- ]?civil|tribunal|greffe|consulat|h[ôo]tel\s+de\s+ville|"
+    r"rue|route|avenue|av|boulevard|bd|chemin|impasse|place|quai|faubourg|"
+    r"all[ée]e|lotissement|r[ée]sidence|"
+    r"d[ée]c[ée]d[ée]?|domicili[ée]e?|demeurant|habitant|n[°ºo])\b.*$", re.I)
+
+
 def _ville(lieu):
-    """Première composante d'un lieu : « Lyon, Rhône, France » → « Lyon »."""
-    return (lieu or "").split(",")[0].strip()
+    """Commune d'un lieu, débarrassée de tout ce qui la suit (voie, mentions,
+    lieu d'enregistrement) : « Lyon, Rhône » → « Lyon » ; « Alger, décédé rue
+    du Numide n°7 » → « Alger » ; « Ténès, Commissariat de la Mairie » →
+    « Ténès » ; « Procida, casa comunale » → « Procida »."""
+    v = (lieu or "").split(",")[0].strip()
+    v = _APRES_COMMUNE.sub("", v)
+    v = re.sub(r"\s+(nella|nel|della|del|de\s+la|di|au|à\s+la|dans)\s*$", "", v, flags=re.I)
+    return v.strip(" -–—,")
+
+
+def _variante(nom_origine):
+    """Segment DISTINCTIF d'un scan, tiré de son nom d'origine : la dernière
+    tranche « _… » — qualité, n° de page, mention marginale
+    (« …_Procida_ameliore.jpg » → « ameliore », « …_p2-fin-acte16-HD » →
+    « p2-fin-acte16-HD »). Sert à distinguer plusieurs vues d'un même acte sans
+    perdre l'information : bien plus parlant qu'un compteur _1/_2. '' si le nom
+    d'origine n'a pas de tranche exploitable."""
+    stem = os.path.splitext(os.path.basename(nom_origine or ""))[0]
+    segs = [s for s in stem.split("_") if s]
+    return fragment(segs[-1]) if len(segs) >= 2 else ""
 
 
 def _etiquette(personne):
@@ -145,7 +186,14 @@ def nom_fichier(nom_origine, type_acte="", personnes=(), date="", lieu="",
 
     base = "_".join(morceaux)
     if total > 1:
-        base += "_%d" % (rang + 1)
+        # Plusieurs vues d'un même acte : on préserve le tag distinctif du nom
+        # d'origine (ameliore, p2-HD, marge-deces1902…) plutôt qu'un compteur
+        # anonyme. On retombe sur un compteur si le nom d'origine n'en a pas,
+        # ou si ce tag n'est que la ville (redondant).
+        tag = _variante(nom_origine)
+        if not tag or tag.lower() == fragment(_ville(lieu)).lower():
+            tag = str(rang + 1)
+        base += "_%s" % tag
 
     dejala = set(existants or ())
     candidat = base + ext
@@ -173,6 +221,25 @@ def apercu(type_acte="", personnes=(), date="", lieu="", fichiers=(),
             "fichiers": renommes}
 
 
+# Rôles qui font d'une personne le SUJET de l'acte (celui/ceux qu'il concerne
+# vraiment). Les autres — témoin, « cité » (mention marginale), parent cité… —
+# ne doivent PAS nommer le fichier : sur l'acte de naissance de Sophie, l'ex-
+# conjoint cité en marge n'a rien à faire dans « …_GARGUILO-Sophie-et-CHETNIK ».
+ROLES_SUJET = ("sujet", "de cujus", "défunt", "defunt",
+               "époux", "epoux", "épouse", "epouse")
+
+
+def _personnes_pour_nom(source, inds):
+    """Personnes à faire figurer dans le NOM de fichier : uniquement les SUJETS
+    (par rôle). S'il n'y a aucun rôle sujet renseigné (sources anciennes), on
+    retombe sur toutes les personnes — comportement d'avant, sans régression."""
+    gens = [p for p in (source.get("personnes") or []) if p.get("id")]
+    sujets = [p for p in gens if (p.get("role") or "").strip().lower() in ROLES_SUJET]
+    retenus = sujets or gens
+    return [{"nom": (inds.get(p["id"]) or {}).get("nom", ""),
+             "prenoms": (inds.get(p["id"]) or {}).get("prenoms", "")} for p in retenus]
+
+
 def _date_evenement(donnees, source):
     """Date de l'ÉVÉNEMENT documenté par la source (naissance / décès / mariage),
     pour nommer le fichier au plus près du sens : un acte de naissance se range
@@ -183,9 +250,7 @@ def _date_evenement(donnees, source):
     gens = source.get("personnes") or []
     ids = [p.get("id") for p in gens if p.get("id")]
     principal = next((p.get("id") for p in gens
-                      if (p.get("role") or "").strip().lower()
-                      in ("sujet", "de cujus", "défunt", "defunt", "époux",
-                          "epoux", "épouse", "epouse")), None)
+                      if (p.get("role") or "").strip().lower() in ROLES_SUJET), None)
     principal = principal or (ids[0] if ids else None)
 
     def _fait(pid, champ):
@@ -222,9 +287,7 @@ def plan(donnees):
         fichiers = s.get("fichiers") or []
         if not fichiers:
             continue
-        personnes = [{"nom": (inds.get(p.get("id")) or {}).get("nom", ""),
-                      "prenoms": (inds.get(p.get("id")) or {}).get("prenoms", "")}
-                     for p in (s.get("personnes") or []) if p.get("id")]
+        personnes = _personnes_pour_nom(s, inds)
         date = _date_evenement(donnees, s) or s.get("date", "")
         total = len(fichiers)
         for i, f in enumerate(fichiers):

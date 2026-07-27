@@ -115,6 +115,51 @@ def test_nom_fichier_collisions():
             a["fichiers"][0]["origine"] == "recto.jpg")
 
 
+def test_variante_preservee():
+    """Plusieurs vues d'un même acte : on garde le tag distinctif du nom
+    d'origine (ameliore, page-droite-HD…) au lieu d'un compteur anonyme."""
+    a = nm.apercu("Acte de mariage", [JEAN, MARIE], "1866", "Procida",
+                  fichiers=["1866_M_X_Procida_ameliore.jpg",
+                            "1866_M_X_Procida_original.jpg",
+                            "1866_M_X_Procida_page-droite-HD.jpg"])
+    noms = [f["propose"] for f in a["fichiers"]]
+    verifie("le tag de variante est conservé  (%r)" % noms,
+            noms[0].endswith("_ameliore.jpg")
+            and noms[1].endswith("_original.jpg")
+            and noms[2].endswith("_page-droite-HD.jpg"))
+
+
+def test_variante_absente_retombe_sur_compteur():
+    """Sans tag exploitable (recto/verso), on garde le compteur _1/_2."""
+    a = nm.apercu("Acte de naissance", [JEAN], "1902", "Lyon",
+                  fichiers=["recto.jpg", "verso.jpg"])
+    noms = [f["propose"] for f in a["fichiers"]]
+    egal("recto/verso → _1 / _2", noms,
+         ["1902_N_DUPONT-Jean_Lyon_1.jpg", "1902_N_DUPONT-Jean_Lyon_2.jpg"])
+
+
+def test_ville_sans_lieu_enregistrement():
+    """La ville ne doit pas charrier le lieu d'enregistrement (mairie…)."""
+    n = nm.nom_fichier("s.jpg", "Acte de mariage", [JEAN], "1854",
+                       "Ténès, Commissariat civil de la Mairie de Ténès")
+    verifie("« Ténès » sans le commissariat  (%r)" % n,
+            "Tenes" in n and "Commissariat" not in n and "Mairie" not in n)
+    n2 = nm.nom_fichier("s.jpg", "Acte de mariage", [JEAN], "1866",
+                        "Procida, casa comunale")
+    verifie("« Procida » sans « casa comunale »  (%r)" % n2,
+            n2.endswith("_Procida.jpg"))
+    # Adresse de rue / mentions : on ne garde que la commune.
+    for lieu, attendu in [
+        ("Alger, décédé rue du Numide n°7", "Alger"),
+        ("Alger rue Comte Route de la Bouzareah", "Alger"),
+        ("Marseille, 26 boulevard de Louvain", "Marseille"),
+        ("Saint-Denis du Sig", "Saint-Denis du Sig"),  # commune multi-mots préservée
+    ]:
+        n = nm.nom_fichier("s.jpg", "Acte de décès", [JEAN], "1887", lieu)
+        verifie("ville=%s pour %r  (%r)" % (attendu, lieu, n),
+                ("_%s.jpg" % nm.fragment(attendu)) in n)
+
+
 def test_nom_fichier_sans_caractere_interdit():
     n = nm.nom_fichier("a.jpg", "Presse / article", [], "1902", "Lyon")
     verifie("aucun caractère interdit par Windows dans %r" % n,
@@ -153,6 +198,8 @@ if __name__ == "__main__":
     for t in (test_date_iso, test_titre_complet, test_titre_deux_personnes_et_plus,
               test_titre_partiel_pas_de_tirets_orphelins, test_nom_fichier,
               test_nom_fichier_extension_et_vide, test_nom_fichier_collisions,
+              test_variante_preservee, test_variante_absente_retombe_sur_compteur,
+              test_ville_sans_lieu_enregistrement,
               test_nom_fichier_sans_caractere_interdit,
               test_route_nomenclature, test_route_personne_inconnue_ne_casse_rien):
         print(t.__name__)

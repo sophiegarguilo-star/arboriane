@@ -21,6 +21,12 @@ export const AIDE_SOURCE = {
 
 export const FIAB = { haute: "ok", moyenne: "info", basse: "attention" };
 
+// Descripteurs du document (PROPRIÉTÉS, pas des types) — restent hors du nom de
+// fichier ; miroir de services/taxonomie_actes.py.
+export const FORMES = ["Original", "Extrait", "Copie", "Transcription", "Photocopie", "Photographie"];
+export const COMPLETUDE = ["Complet", "Incomplet", "Fragment"];
+export const VISIBILITE = ["Public", "Privé", "Sensible"];
+
 // Vocabulaire canonique des types d'acte (menu déroulant — évite les fautes de
 // frappe, et donne son code court au nom de fichier côté serveur).
 export const TYPES_ACTE = [

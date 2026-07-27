@@ -42,19 +42,40 @@ export async function vueDonnees(vue) {
       } catch (e) { toast(e.message); }
     } }, "Créer une sauvegarde complète")));
 
-  // 2) Export GEDCOM
-  vue.append(h("div", { class: "carte" },
-    h("h2", {}, "📤 Exporter en GEDCOM (.ged)"),
-    h("p", { class: "sous-titre" },
-      "Le format d'échange standard, lisible par Geneanet, Heredis, "
-      + "MyHeritage, Gramps… Les originaux ne sont jamais modifiés."),
-    h("button", { class: "bouton secondaire", onclick: async () => {
-      try {
-        const r = await apiGet("/api/export/gedcom");
-        telechargerTexte((esp.nom || "arbre") + ".ged", r.texte);
-        toast("GEDCOM exporté (aussi enregistré dans Exports/).");
-      } catch (e) { toast(e.message); }
-    } }, "Télécharger le GEDCOM")));
+  // 2) Export GEDCOM (avec profil d'optimisation par site)
+  {
+    const selProfil = h("select", {},
+      h("option", { value: "generique" }, "Générique (archivage complet)"),
+      h("option", { value: "geneanet" }, "Geneanet"),
+      h("option", { value: "myheritage" }, "MyHeritage"),
+      h("option", { value: "ancestry" }, "Ancestry"),
+      h("option", { value: "filae" }, "Filae"));
+    const caseTrans = h("input", { type: "checkbox", checked: true });
+    vue.append(h("div", { class: "carte" },
+      h("h2", {}, "📤 Exporter en GEDCOM (.ged)"),
+      h("p", { class: "sous-titre" },
+        "Le format d'échange standard, lisible par Geneanet, Heredis, "
+        + "MyHeritage, Gramps… Les originaux ne sont jamais modifiés."),
+      h("div", { style: "display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px" },
+        h("div", {}, h("label", {}, "Optimiser pour"), selProfil),
+        h("label", { style: "display:flex;gap:6px;align-items:center;cursor:pointer" },
+          caseTrans, h("span", {}, "Inclure la transcription complète"))),
+      h("p", { class: "sous-titre", style: "font-style:italic" },
+        "ℹ Les photos et scans ne sont pas transportés par le GEDCOM : "
+        + "à réimporter à la main sur le site de destination."),
+      h("button", { class: "bouton secondaire", onclick: async () => {
+        try {
+          const p = selProfil.value;
+          const tc = caseTrans.checked ? "1" : "0";
+          const url = "/api/export/gedcom?profil=" + encodeURIComponent(p)
+            + "&transcription=" + tc;
+          const r = await apiGet(url);
+          const suff = (p && p !== "generique") ? ("_" + p) : "";
+          telechargerTexte((esp.nom || "arbre") + suff + ".ged", r.texte);
+          toast("GEDCOM exporté (aussi enregistré dans Exports/).");
+        } catch (e) { toast(e.message); }
+      } }, "Télécharger le GEDCOM")));
+  }
 
   // 2a-bis) Export d'un rameau (ascendance / descendance d'une personne)
   {

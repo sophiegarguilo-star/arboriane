@@ -58,6 +58,23 @@ def test_sources_crud():
     verifie("source supprimée", src["id"] not in base.donnees["sources"])
 
 
+def test_descripteurs_document():
+    """Forme / complétude / visibilité : stockés, et préservés à l'aller-retour
+    GEDCOM (tags privés _FORME/_COMPL/_VISI)."""
+    from core import gedcom
+    app = base_demo()
+    src = app.base.creer_source({"titre": "Extrait", "type": "Acte de naissance",
+        "forme": "Extrait", "completude": "Fragment", "visibilite": "Sensible"})
+    s = app.base.donnees["sources"][src["id"]]
+    verifie("descripteurs stockés",
+            (s["forme"], s["completude"], s["visibilite"]) == ("Extrait", "Fragment", "Sensible"))
+    texte = gedcom.exporter(app.base.donnees)
+    d2 = gedcom.importer(texte)
+    s2 = next(x for x in d2["sources"].values() if x.get("titre") == "Extrait")
+    verifie("descripteurs préservés en GEDCOM",
+            (s2["forme"], s2["completude"], s2["visibilite"]) == ("Extrait", "Fragment", "Sensible"))
+
+
 def test_preuves():
     app = base_demo()
     d = app.base.donnees
@@ -146,7 +163,8 @@ def test_lieux():
 
 
 if __name__ == "__main__":
-    for fn in (test_sources_crud, test_preuves, test_media, test_publication,
+    for fn in (test_sources_crud, test_descripteurs_document, test_preuves,
+               test_media, test_publication,
                test_gedzip, test_cadrage_photo_conserve, test_apercu_saute_les_pdf, test_lieux):
         print(fn.__name__)
         fn()

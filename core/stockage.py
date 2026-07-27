@@ -197,6 +197,39 @@ class Base:
             return ""
         return (valeur if isinstance(valeur, str) else str(valeur))[:maxi]
 
+    # Faits en LISTE qui peuvent porter des preuves (citations à l'intérieur de
+    # chaque élément). Clés servant à ré-identifier un élément d'une saisie à la
+    # suivante, pour lui reporter ses citations quand le client les omet.
+    _CHAMPS_LISTE_SOURCABLES = {
+        "professions": ("valeur", "date"),
+        "residences": ("date", "lieu"),
+        "evenements": ("type", "precision", "date", "lieu", "valeur"),
+    }
+
+    @staticmethod
+    def _reporter_citations_liste(anciens, nouveaux, cles):
+        """Reporte les citations des anciens éléments vers les nouveaux quand le
+        client renvoie la liste SANS le sous-champ « citations » (un formulaire
+        qui ne connaît que date/lieu ne doit pas effacer les preuves déjà
+        attachées). Appariement par valeurs (cles), chaque ancien consommé une
+        fois — robuste au réordonnancement, contrairement à l'index."""
+        restants = [a for a in (anciens or []) if isinstance(a, dict) and a.get("citations")]
+        if not restants:
+            return
+        def signature(it):
+            return tuple((it or {}).get(k, "") for k in cles)
+        for neuf in nouveaux:
+            # « citations » présent (même vide) = intention explicite du client,
+            # on respecte ; on ne restaure QUE si la clé est absente (formulaire).
+            if not isinstance(neuf, dict) or "citations" in neuf:
+                continue
+            sig = signature(neuf)
+            for i, anc in enumerate(restants):
+                if signature(anc) == sig:
+                    neuf["citations"] = anc["citations"]
+                    restants.pop(i)
+                    break
+
     @_synchronise
     def modifier_individu(self, ident, champs):
         ind = self.donnees["individus"].get(ident)
@@ -212,6 +245,12 @@ class Base:
                     anciennes = (ind.get(cle) or {}).get("citations")
                     if anciennes:
                         valeur["citations"] = anciennes
+                # Même garde-fou pour les faits EN LISTE (métiers, résidences,
+                # événements) : un formulaire qui renvoie {date, lieu} sans les
+                # citations ne doit plus effacer les preuves déjà reliées.
+                if cle in self._CHAMPS_LISTE_SOURCABLES:
+                    self._reporter_citations_liste(
+                        ind.get(cle), valeur, self._CHAMPS_LISTE_SOURCABLES[cle])
                 ind[cle] = valeur
         self.sauvegarder()
         return ind
@@ -504,6 +543,8 @@ class Base:
         "titre", "type", "date", "lieu", "ville", "pays", "auteur", "depot",
         "depot_id", "cote", "page", "publ", "ark", "fiabilite", "statut", "note",
         "transcription", "fichier", "fichiers", "personnes",
+        # Descripteurs du document (propriétés, pas des types) — choix « nom court ».
+        "forme", "completude", "visibilite",
     )
 
     @_synchronise

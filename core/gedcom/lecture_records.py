@@ -197,6 +197,13 @@ def lire_fam(rec):
             fam["note"] = _lire_note(enf)
         elif tag in TAGS_EVT_FAM:
             fam["evenements"].append(_evenement_generique(enf))
+    # Sources posées DIRECTEMENT sur la famille (« 1 SOUR » sous le FAM, pas
+    # sous MARR) : beaucoup de logiciels les rangent là, surtout quand un
+    # conjoint est inconnu. On les rattache au mariage (le fait « union »),
+    # sinon elles étaient perdues et la personne apparaissait « sans source ».
+    cites_fam = _citations(rec)
+    if cites_fam:
+        fam["mariage"].setdefault("citations", []).extend(cites_fam)
     return fam
 
 
@@ -211,7 +218,8 @@ def lire_sour(rec, repo_rx, depots_imp):
     src = {"id": sid, "titre": "", "type": "", "date": "", "lieu": "",
            "ville": "", "pays": "", "auteur": "", "depot": "", "cote": "",
            "abbr": "", "publ": "", "ark": "", "note": "", "fichier": "",
-           "fichiers": [], "transcription": "", "personnes": []}
+           "fichiers": [], "transcription": "", "personnes": [],
+           "forme": "", "completude": "", "visibilite": ""}
     for enf in rec["enfants"]:
         if enf["tag"] == "TITL":
             src["titre"] = _fusion_texte(enf).strip()
@@ -263,6 +271,12 @@ def lire_sour(rec, repo_rx, depots_imp):
             src["ville"] = _fusion_texte(enf).strip()
         elif enf["tag"] == "_PAYS":
             src["pays"] = _fusion_texte(enf).strip()
+        elif enf["tag"] == "_FORME":
+            src["forme"] = _fusion_texte(enf).strip()
+        elif enf["tag"] == "_COMPL":
+            src["completude"] = _fusion_texte(enf).strip()
+        elif enf["tag"] == "_VISI":
+            src["visibilite"] = _fusion_texte(enf).strip()
         elif enf["tag"] in ("WWW", "_ARK", "_LINK"):
             if not src["ark"]:
                 src["ark"] = _fusion_texte(enf).strip()

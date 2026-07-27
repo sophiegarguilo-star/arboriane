@@ -54,11 +54,24 @@ def apercu(app, params, corps):
     return {"masques": masques, "total": len(masques)}
 
 
+def _profil(corps):
+    """(profil, transcription_complete) depuis le corps de requête (tolérant)."""
+    corps = corps or {}
+    profil = corps.get("profil")
+    tc = corps.get("transcription_complete", True)
+    return (str(profil).strip().lower() if profil else None), bool(tc)
+
+
 @route("POST", r"^/api/publication/gedcom$")
 def gedcom_public(app, params, corps):
-    """Exporte le GEDCOM public (vivants masqués) dans Exports/."""
+    """Exporte le GEDCOM public (vivants masqués) dans Exports/.
+
+    Corps facultatif : profil (site cible) + transcription_complete (bool)."""
     _actif(app)
-    chemin = publication.exporter_gedcom_public(app, _options(corps))
+    profil, complete = _profil(corps)
+    chemin = publication.exporter_gedcom_public(app, _options(corps),
+                                                profil=profil,
+                                                transcription_complete=complete)
     return {"ok": True, "fichier": os.path.basename(chemin)}
 
 

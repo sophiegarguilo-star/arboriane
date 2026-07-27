@@ -18,8 +18,15 @@ def _actif(app):
 
 @route("GET", r"^/api/export/gedcom$")
 def exporter(app, params, corps):
+    """Export GEDCOM. Paramètres de requête facultatifs :
+      profil = generique|geneanet|myheritage|ancestry|filae (optimisation site),
+      transcription = 1|0 (0 = résumé au lieu de la transcription intégrale)."""
     _actif(app)
-    chemin, texte = echange.exporter(app)
+    params = params or {}
+    profil = params.get("profil")
+    complete = str(params.get("transcription", "1")).strip().lower() not in ("0", "false", "non")
+    chemin, texte = echange.exporter(app, profil=profil,
+                                     transcription_complete=complete)
     return {"ok": True, "fichier": os.path.basename(chemin), "texte": texte}
 
 

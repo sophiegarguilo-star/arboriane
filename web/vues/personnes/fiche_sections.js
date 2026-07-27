@@ -238,7 +238,7 @@ export function sectionDocuments(f) {
 
 const NIVEAU_BADGE = {
   acte: ["Prouvé par acte", "ok"], declare: ["Déclaré", "info"],
-  estime: ["Estimé", "attention"], non_qualifie: ["Source non qualifiée", "attention"],
+  estime: ["Estimé", "attention"], non_qualifie: ["Sourcé", "info"],
   manquant: ["À prouver", "attention"],
 };
 

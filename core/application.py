@@ -490,6 +490,20 @@ class Application:
         except OSError:
             return []
 
+    def ecrire_legende_codes(self, texte):
+        """Écrit la légende des codes de nomenclature dans Sources/_LEGENDE-codes.txt
+        de l'arbre actif, pour l'avoir sous la main dans l'explorateur. Renvoie
+        le nom du fichier, ou None si aucun arbre n'est ouvert."""
+        if not self.espace_chemin:
+            return None
+        base_dir = os.path.join(self.espace_chemin, self.CATEGORIES["Sources"])
+        os.makedirs(base_dir, exist_ok=True)
+        nom = "_LEGENDE-codes.txt"
+        cible = dans(base_dir, nom)
+        with open(cible, "w", encoding="utf-8") as f:
+            f.write(texte or "")
+        return nom
+
     def chemin_media(self, categorie, nom):
         """Chemin absolu d'un média (pour le servir), garanti dans l'arbre."""
         if not self.espace_chemin:

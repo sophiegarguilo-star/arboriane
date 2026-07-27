@@ -15,7 +15,8 @@ import { apiGet, apiJson } from "../../noyau/api.js";
 import { toast } from "../../composants/toast.js";
 import { champSource } from "../../composants/champSource.js";
 import { champLieu, chargerLieux } from "../../composants/champLieu.js";
-import { STATUTS, STATUT_LABEL, AIDE_SOURCE, TYPES_ACTE } from "./commun.js";
+import { STATUTS, STATUT_LABEL, AIDE_SOURCE,
+         FORMES, COMPLETUDE, VISIBILITE } from "./commun.js";
 import { blocPersonnes } from "./personnes.js";
 import { blocScans } from "./scans.js";
 import { detail } from "./detail.js";
@@ -47,28 +48,65 @@ export async function formulaire(src, opts = {}) {
   const champs = {};
   const lieux = await chargerLieux(apiGet);
   const personnes = await apiGet("/api/individus").catch(() => []);
+  const taxo = ((await apiGet("/api/nomenclature/taxonomie")
+                  .catch(() => ({}))).selecteur) || [];
   const carte = h("div", { class: "carte", style: "max-width:680px" });
 
-  // ── 1. Type d'acte — la première chose qu'on sait ─────────────────────
-  const typeConnu = !src.type || TYPES_ACTE.includes(src.type);
-  const selType = h("select", { style: "width:100%" },
-    h("option", { value: "", selected: !src.type ? "selected" : null }, "— (à préciser)"),
-    ...TYPES_ACTE.map((t) => h("option", { value: t, selected: src.type === t ? "selected" : null }, t)),
-    h("option", { value: "__autre__", selected: !typeConnu ? "selected" : null },
-      "Autre (à préciser)…"));
-  // Champ libre affiché quand « Autre… » est choisi : permet un type personnalisé
-  // (ex. « Acte de baptême protestant », « Contrat de mariage »…).
+  // ── 1. Type d'acte — Famille → Sous-famille → Type précis ─────────────
+  // Le type reste une chaîne unique (le type-feuille) : compatible avec les
+  // sources existantes et le GEDCOM (SOUR.DATA.EVEN). La taxonomie ne sert qu'à
+  // NAVIGUER jusqu'à ce type sans le chercher dans une liste à rallonge.
+  function chaineDe(t) {
+    for (const f of taxo) for (const s of f.sous) for (const ty of s.types)
+      if (ty.type === t) return { fam: f.famille, sf: s.sous_famille };
+    return null;
+  }
+  const chaine = chaineDe(src.type);
+  const typeConnu = !src.type || !!chaine;   // un type hors taxonomie -> « Autre »
+  const opt = (v, txt, sel) => h("option", { value: v, selected: sel ? "selected" : null }, txt);
+
+  const selFam = h("select", { style: "flex:1;min-width:170px" });
+  const selSF = h("select", { style: "flex:1;min-width:150px" });
+  const selType = h("select", { style: "flex:1;min-width:150px" });
   const inAutre = h("input", {
     style: "width:100%;margin-top:6px;" + (typeConnu ? "display:none" : ""),
     placeholder: "Votre type d'acte…", value: typeConnu ? "" : src.type });
-  selType.addEventListener("change", () => {
+
+  function remplirFam() {
+    vider(selFam);
+    selFam.append(opt("", "— Famille —", false));
+    taxo.forEach((f) => selFam.append(opt(f.famille, f.famille, chaine && chaine.fam === f.famille)));
+  }
+  function remplirSF() {
+    vider(selSF);
+    const f = taxo.find((x) => x.famille === selFam.value);
+    selSF.append(opt("", "— Sous-famille —", false));
+    (f ? f.sous : []).forEach((s) =>
+      selSF.append(opt(s.sous_famille, s.sous_famille, chaine && chaine.sf === s.sous_famille)));
+  }
+  function remplirType() {
+    vider(selType);
+    const f = taxo.find((x) => x.famille === selFam.value);
+    const s = f ? f.sous.find((y) => y.sous_famille === selSF.value) : null;
+    selType.append(opt("", "— Type précis —", false));
+    (s ? s.types : []).forEach((ty) => selType.append(opt(ty.type, ty.type, src.type === ty.type)));
+    selType.append(opt("__autre__", "Autre (à préciser)…", !typeConnu));
+  }
+  function majAutre() {
     inAutre.style.display = selType.value === "__autre__" ? "" : "none";
-    if (selType.value === "__autre__") inAutre.focus();
-  });
-  champs.type = selType;
-  // Valeur réelle du type : le champ libre si « Autre… », sinon l'option choisie.
+    if (selType.value === "__autre__" && document.activeElement === selType) inAutre.focus();
+  }
+  selFam.addEventListener("change", () => { remplirSF(); remplirType(); majAutre(); rafraichir(); });
+  selSF.addEventListener("change", () => { remplirType(); majAutre(); rafraichir(); });
+  selType.addEventListener("change", () => { majAutre(); rafraichir(); });
+  remplirFam(); remplirSF(); remplirType(); majAutre();
+
+  champs.type = selType;   // écrasé par lireType() au save (ligne « corps.type = … »)
+  // Valeur réelle du type : le champ libre si « Autre… », sinon le type-feuille.
   const lireType = () => (selType.value === "__autre__" ? inAutre.value.trim() : selType.value);
-  carte.append(h("div", { class: "champ" }, h("label", {}, "Type d'acte"), selType, inAutre));
+  carte.append(h("div", { class: "champ" }, h("label", {}, "Type d'acte"),
+    h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }, selFam, selSF, selType),
+    inAutre));
 
   // ── 2. Personnes citées — l'indexation, au moment où l'on y pense ─────
   // En modification, on repart des personnes déjà citées : le formulaire les
@@ -134,6 +172,19 @@ export async function formulaire(src, opts = {}) {
   carte.append(h("div", { style: "display:flex;gap:12px" },
     h("div", { class: "champ" }, h("label", {}, "Fiabilité"), selFiab),
     h("div", { class: "champ" }, h("label", {}, "Statut"), selStatut)));
+
+  // Descripteurs du document (propriétés, hors du nom de fichier).
+  const selDescr = (liste, val, titre) => h("select", { title: titre },
+    ...["", ...liste].map((v) => h("option", { value: v,
+      selected: val === v ? "selected" : null }, v || "—")));
+  const selForme = selDescr(FORMES, src.forme, "Original, copie, extrait, transcription…");
+  const selCompl = selDescr(COMPLETUDE, src.completude, "Le document est-il entier ?");
+  const selVisi = selDescr(VISIBILITE, src.visibilite, "Diffusion : public, privé, sensible.");
+  champs.forme = selForme; champs.completude = selCompl; champs.visibilite = selVisi;
+  carte.append(h("div", { style: "display:flex;gap:12px" },
+    h("div", { class: "champ" }, h("label", {}, "Forme"), selForme),
+    h("div", { class: "champ" }, h("label", {}, "Complétude"), selCompl),
+    h("div", { class: "champ" }, h("label", {}, "Visibilité"), selVisi)));
 
   // ── 4. Scans, et leur nom sur le disque ──────────────────────────────
   const blocFichiers = blocScans(src.fichiers || [], { onChange: () => rafraichir() });

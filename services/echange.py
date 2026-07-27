@@ -17,14 +17,29 @@ def _cle(ind):
     return (modele.nom_complet(ind).lower(), modele.annee_naissance(ind))
 
 
-def exporter(app):
-    """Écrit le GEDCOM de l'arbre actif dans Exports/ et renvoie (chemin, texte)."""
+def exporter(app, profil=None, transcription_complete=True):
+    """Écrit le GEDCOM de l'arbre actif dans Exports/ et renvoie (chemin, texte).
+
+    `profil` (facultatif) optimise le fichier pour un site cible (Geneanet,
+    MyHeritage, Ancestry, Filae) en repliant l'info riche là où le site la garde
+    — voir services.profils_export. None ou « generique » = export standard.
+    `transcription_complete` : False replie un résumé au lieu de l'intégrale."""
     if not app.espace_chemin:
         raise ValueError("Aucun arbre ouvert.")
-    texte = gedcom.exporter(app.base.donnees)
+    donnees = app.base.donnees
+    profils_export = None
+    if profil and profil != "generique":
+        from services import profils_export
+        donnees = profils_export.appliquer_profil(donnees, profil,
+                                                   transcription_complete)
+    texte = gedcom.exporter(donnees)
+    if profils_export is not None:   # ex. Geneanet : retrait des tags privés
+        texte = profils_export.nettoyer_texte(texte, profil)
     c = chemins(app.espace_chemin)
-    cible = dans(c["exports"], "%s_%s.ged"
-                 % (nom_sur(app.manifeste.get("nom", "arbre")), horodatage()))
+    suffixe = ("_" + profil) if (profil and profil != "generique") else ""
+    cible = dans(c["exports"], "%s%s_%s.ged"
+                 % (nom_sur(app.manifeste.get("nom", "arbre")), suffixe,
+                    horodatage()))
     with open(cible, "w", encoding="utf-8") as f:
         f.write(texte)
     return cible, texte

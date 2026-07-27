@@ -52,6 +52,25 @@ function spanVersion() {
   return s;
 }
 
+// Légende des codes de nomenclature : lue depuis le backend (source unique
+// services/taxonomie_actes.py), rendue en tableau. Reste synchro avec la
+// taxonomie sans recopier la liste dans l'aide.
+function tableauLegende() {
+  const conteneur = h("div", { class: "aide-legende" }, h("p", {}, "Chargement de la légende…"));
+  apiGet("/api/nomenclature/legende").then((d) => {
+    vider(conteneur);
+    const rows = (d && d.entrees) || [];
+    if (!rows.length) { conteneur.append(h("p", {}, "Légende indisponible.")); return; }
+    conteneur.append(h("table", { class: "aide-table" },
+      h("thead", {}, h("tr", {}, h("th", {}, "Code"), h("th", {}, "Type de document"))),
+      h("tbody", {}, ...rows.map((e) =>
+        h("tr", {},
+          h("td", {}, h("code", {}, e.code)),
+          h("td", {}, (e.types || []).join(" / ")))))));
+  }).catch(() => { vider(conteneur); conteneur.append(h("p", {}, "Légende indisponible.")); });
+  return conteneur;
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    RUBRIQUES. Chaque rubrique : { cle, titre, groupe, mots, rendu() }.
    `mots` alimente la recherche ; `rendu` construit le contenu à la volée.
@@ -294,6 +313,29 @@ const RUBRIQUES = [
       encart("attention", "Vérifiez vos ", fort("droits de diffusion"), " avant de "
         + "publier l'image d'un acte : certains dépôts d'archives limitent la "
         + "rediffusion de leurs reproductions."),
+      versOnglet("actes", "Aller aux actes"),
+    ],
+  },
+  {
+    cle: "tuto-nomenclature", groupe: "Tutoriels", titre: "Comment vos pièces sont nommées",
+    mots: "nom fichier scan renommer rangement ranger code nomenclature tri chronologique "
+      + "légende date explorateur indexation abréviation",
+    rendu: () => [
+      p("Quand vous « rangez les pièces », Arboriane renomme chaque scan avec un nom "
+        + "triable : la date en tête, un code de type, la ou les personnes, la ville, et "
+        + "un éventuel repère de la vue (qualité, page, mention)."),
+      bloc("Format du nom",
+        h("pre", { class: "aide-mono" }, "<date>_<CODE>_<NOM-Prénom>_<Ville>[_<variante>].jpg"),
+        p("Exemple : ", h("code", {},
+          "1866_M_AMBROSINO-Michel-et-REFUTO-Marie_Procida_ameliore.jpg"))),
+      encart("astuce", "La date en tête (année-mois-jour) fait que l'Explorateur range "
+        + "vos actes ", fort("dans l'ordre chronologique"), " tout seul."),
+      encart("aretenir", "Le ", fort("titre"), " de la source, lui, reste lisible et "
+        + "n'est pas modifié : le code sert au rangement des fichiers, pas à la lecture."),
+      bloc("Légende des codes", tableauLegende()),
+      encart("astuce", "Cette légende est aussi écrite dans le fichier ",
+        fort("Sources\\_LEGENDE-codes.txt"), " de votre arbre, pour l'avoir sous la main "
+        + "dans l'explorateur."),
       versOnglet("actes", "Aller aux actes"),
     ],
   },

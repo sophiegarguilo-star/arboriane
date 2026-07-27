@@ -59,7 +59,14 @@ def log(msg):
 
 # ── 1. Synchroniser la version (source unique core/version.py) ───────────
 def sync_version():
-    maj, mineur, corr = (VERSION.split(".") + ["0", "0", "0"])[:3]
+    # Le tuple Windows filevers/prodvers exige des ENTIERS : on ne garde que la
+    # partie numérique de chaque composant (« 0-dev » -> « 0 »). La chaîne
+    # affichée (FileVersion/ProductVersion, ci-dessous) conserve la version
+    # complète, suffixe de pré-version inclus.
+    def _num(x):
+        m = re.match(r"\d+", x or "")
+        return m.group(0) if m else "0"
+    maj, mineur, corr = [_num(p) for p in (VERSION.split(".") + ["0", "0", "0"])[:3]]
     tup = "(%s, %s, %s, 0)" % (maj, mineur, corr)
     vi = os.path.join(RACINE, "version_info.txt")
     if os.path.isfile(vi):

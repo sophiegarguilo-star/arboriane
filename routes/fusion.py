@@ -40,6 +40,20 @@ def fusionner_personnes(app, params, corps):
     return {"ok": True, "resume": resume}
 
 
+@route("POST", r"^/api/fusion/ecarter$")
+def ecarter(app, params, corps):
+    """Marque une paire « pas un doublon » pour ne plus la reproposer."""
+    err = _besoin_arbre(app)
+    if err:
+        return err
+    c = corps or {}
+    try:
+        res = fa.ecarter_paire(app.base, c.get("a", ""), c.get("b", ""))
+    except ValueError as e:
+        return (400, {"erreur": str(e)})
+    return {"ok": True, **res}
+
+
 @route("GET", r"^/api/fusion/lieux$")
 def lieux(app, params, corps):
     err = _besoin_arbre(app)

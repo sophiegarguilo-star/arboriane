@@ -77,15 +77,45 @@ def _niveau(score):
     return "eleve" if score >= 70 else ("moyen" if score >= 45 else "faible")
 
 
+def _cle_paire(a, b):
+    """Clé stable d'une paire (indépendante de l'ordre)."""
+    return "|".join(sorted([a, b]))
+
+
+def _paires_ecartees(donnees):
+    """Paires que l'utilisateur a marquées « pas un doublon » (persistées)."""
+    return set((donnees.get("meta") or {}).get("doublons_ecartes") or [])
+
+
 def paires_scorees(donnees):
     """Doublons probables enrichis d'un score de confiance, triés du plus au
-    moins probable."""
+    moins probable. Les paires explicitement écartées sont exclues."""
+    ecartees = _paires_ecartees(donnees)
     out = []
     for p in fusion.doublons_probables(donnees):
+        if _cle_paire(p["a"], p["b"]) in ecartees:
+            continue
         score, indices = score_paire(donnees, p["a"], p["b"])
         out.append(dict(p, score=score, niveau=_niveau(score), indices=indices))
     out.sort(key=lambda x: -x["score"])
     return out
+
+
+def ecarter_paire(base, ida, idb):
+    """Marque une paire comme « ce n'est pas un doublon » : elle ne sera plus
+    proposée dans la fusion assistée. Décision persistée dans meta."""
+    if not ida or not idb or ida == idb:
+        raise ValueError("Paire invalide.")
+    inds = base.donnees.get("individus", {})
+    if ida not in inds or idb not in inds:
+        raise ValueError("Personne introuvable.")
+    meta = base.donnees.setdefault("meta", {})
+    lst = meta.setdefault("doublons_ecartes", [])
+    cle = _cle_paire(ida, idb)
+    if cle not in lst:
+        lst.append(cle)
+        base.sauvegarder()
+    return {"ecartee": cle}
 
 
 # ── Personnes : comparaison champ par champ ─────────────────────────────────

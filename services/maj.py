@@ -25,6 +25,30 @@ PAGE = "https://sophiegarguilo-star.github.io/arboriane/"
 # Journal des nouveautés, du plus récent au plus ancien. À COMPLÉTER à chaque
 # version livrée (une entrée = ce que l'utilisateur gagne, en clair).
 NOTES = [
+    {"version": "1.10.0", "date": "2026-07-24", "points": [
+        "Export optimisé selon le site de destination : un nouveau menu "
+        "« Optimiser pour » (Générique, Geneanet, MyHeritage, Ancestry, Filae) "
+        "range chaque information là où le site sait la conserver. Un bloc de "
+        "provenance (dépôt, cote, lien de l'acte) est désormais préservé "
+        "partout, et vous pouvez choisir d'inclure ou non la transcription "
+        "intégrale des actes.",
+        "Les preuves ne disparaissent plus : relier une source à un métier, "
+        "une résidence ou un événement était perdu dès qu'on ré-enregistrait la "
+        "fiche. C'est corrigé — un lien vers une source reste définitif.",
+        "Sources d'union mieux prises en compte : une source attachée à la "
+        "famille (au mariage) crédite maintenant les deux époux, même quand un "
+        "conjoint est inconnu. Fini les personnes signalées « sans source » à "
+        "tort.",
+        "Import plus respectueux : un fait déjà sourcé mais sans niveau de "
+        "fiabilité (fréquent après un import GEDCOM) n'est plus redemandé « à "
+        "valider ». Seuls les faits réellement sans aucune source restent au "
+        "plan de recherche.",
+        "Fusion des doublons : nouveau bouton « Ce n'est pas un doublon » qui "
+        "écarte définitivement une paire pour ne plus jamais la reproposer ; la "
+        "comparaison en deux colonnes est conservée.",
+        "Types d'actes enrichis : nouvelle rubrique « Tables et index » (index "
+        "de baptêmes, naissances, mariages, décès, et tables décennales).",
+    ]},
     {"version": "1.9.5", "date": "2026-07-12", "points": [
         "Import GEDCOM ANSI : correction d'un cas où un seul caractère non "
         "reconnu suffisait à casser TOUS les accents du fichier (ils "

@@ -137,7 +137,11 @@ def _actes_a_trouver(donnees, preuves=None):
     for pid, ind in donnees["individus"].items():
         pv = preuves[pid] if preuves is not None else src_svc.preuves_personne(donnees, pid)
         for f in pv["faits"]:
-            if f["present"] and f["niveau"] in ("manquant", "non_qualifie", "estime"):
+            # « non_qualifie » = le fait A une source, juste sans niveau de
+            # fiabilité (fréquent après import GEDCOM : la plupart des logiciels
+            # n'exportent pas QUAY). Un fait sourcé n'est PAS une tâche à faire —
+            # on ne nage plus l'utilisateur pour ré-attester ce qui est déjà cité.
+            if f["present"] and f["niveau"] in ("manquant", "estime"):
                 p = _piste(
                     "Actes à trouver", 2 if f["niveau"] == "estime" else 3, pid,
                     nom_complet(ind),
