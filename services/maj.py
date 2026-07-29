@@ -25,6 +25,16 @@ PAGE = "https://sophiegarguilo-star.github.io/arboriane/"
 # Journal des nouveautés, du plus récent au plus ancien. À COMPLÉTER à chaque
 # version livrée (une entrée = ce que l'utilisateur gagne, en clair).
 NOTES = [
+    {"version": "1.10.1", "date": "2026-07-29", "points": [
+        "Import de fichiers venant d'autres logiciels (Heredis en particulier) : "
+        "les tags techniques du logiciel d'origine — date de création ou de "
+        "mise à jour d'une fiche — ne sont plus importés comme des lignes dans "
+        "« Vie & chronologie », où ils n'avaient pas leur place.",
+        "La nature de la filiation (légitime, naturel, adopté…) est désormais "
+        "conservée dans un champ « Filiation » affiché sur la fiche, hors de la "
+        "frise de vie, et préservée à l'export. Les tags privés non reconnus, "
+        "eux, restent conservés comme avant pour ne rien perdre.",
+    ]},
     {"version": "1.10.0", "date": "2026-07-24", "points": [
         "Export optimisé selon le site de destination : un nouveau menu "
         "« Optimiser pour » (Générique, Geneanet, MyHeritage, Ancestry, Filae) "

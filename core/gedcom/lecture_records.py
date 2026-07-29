@@ -13,6 +13,13 @@ from core.gedcom.commun import *
 from core.gedcom.champs import *
 
 
+# Tags PRIVÉS de logiciels tiers qui ne sont que des métadonnées internes (date
+# de création/màj d'une fiche) : on ne les importe pas — sinon ils s'affichaient
+# comme des lignes dans « Vie & chronologie ». Les VRAIS tags inconnus, eux, sont
+# toujours conservés en événement générique (aller-retour sans perte).
+_TAGS_META_IGNORES = frozenset(("_CREA", "_UPD"))
+
+
 def lire_indi(rec):
     """Construit l'individu (dict au schéma cible) depuis un noeud « 0 @I@ INDI »."""
     ident = _pointeur(rec["xref"])
@@ -26,6 +33,7 @@ def lire_indi(rec):
         "nom_particule": "",
         "nom_marital": "",
         "surnom": "",   # surnom / nom « dit » : NICK
+        "filiation": "",   # nature de filiation (Heredis _FIL) : hors chronologie
         "noms_alternatifs": [],
         "naissance": {"date": "", "lieu": ""},
         "deces": {"date": "", "lieu": ""},
@@ -150,6 +158,18 @@ def lire_indi(rec):
             fid = _pointeur(enf["valeur"])
             if fid:
                 ind["fams"].append(fid)
+        elif tag in _TAGS_META_IGNORES:
+            # métadonnée du logiciel source (date de création/màj d'une fiche
+            # Heredis, etc.) : aucune valeur généalogique → on ne l'importe pas
+            # (sinon elle s'affichait comme une ligne dans « Vie & chronologie »).
+            pass
+        elif tag == "_FIL":
+            # nature de la filiation Heredis (légitime, naturel, adopté…) : c'est
+            # une vraie info, mais elle n'a pas sa place dans la frise. On la range
+            # dans un champ dédié, affiché sur la fiche, hors chronologie.
+            fil = _fusion_texte(enf).strip()
+            if fil and not ind.get("filiation"):
+                ind["filiation"] = fil
         elif tag in TAGS_EVT_INDI:
             ind["evenements"].append(_evenement_generique(enf))
         elif tag.startswith("_"):

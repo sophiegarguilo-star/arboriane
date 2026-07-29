@@ -163,7 +163,7 @@ class Base:
     CHAMPS_INDIVIDU = (
         "sexe", "prenoms", "nom", "prenom_principal", "prenoms_secondaires",
         "nom_particule", "nom_prefixe", "nom_suffixe",
-        "nom_marital", "surnom", "noms_alternatifs",
+        "nom_marital", "surnom", "filiation", "noms_alternatifs",
         "naissance", "deces", "professions", "residences", "note", "tags",
         "pistes", "evenements", "medias", "citations", "vivant",
         "associations", "refn", "resn",       # importés du GEDCOM : rendre éditables

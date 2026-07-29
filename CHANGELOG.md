@@ -9,6 +9,11 @@ Toutes les versions notables d'Arboriane. Format inspiré de
 > `python -X utf8 outils/generer_changelog.py`.
 
 
+## [1.10.1](https://github.com/sophiegarguilo-star/arboriane/releases/tag/v1.10.1) — 2026-07-29
+
+- Import de fichiers venant d'autres logiciels (Heredis en particulier) : les tags techniques du logiciel d'origine — date de création ou de mise à jour d'une fiche — ne sont plus importés comme des lignes dans « Vie & chronologie », où ils n'avaient pas leur place.
+- La nature de la filiation (légitime, naturel, adopté…) est désormais conservée dans un champ « Filiation » affiché sur la fiche, hors de la frise de vie, et préservée à l'export. Les tags privés non reconnus, eux, restent conservés comme avant pour ne rien perdre.
+
 ## [1.10.0](https://github.com/sophiegarguilo-star/arboriane/releases/tag/v1.10.0) — 2026-07-24
 
 - Export optimisé selon le site de destination : un nouveau menu « Optimiser pour » (Générique, Geneanet, MyHeritage, Ancestry, Filae) range chaque information là où le site sait la conserver. Un bloc de provenance (dépôt, cote, lien de l'acte) est désormais préservé partout, et vous pouvez choisir d'inclure ou non la transcription intégrale des actes.

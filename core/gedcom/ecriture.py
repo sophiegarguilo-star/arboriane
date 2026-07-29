@@ -300,6 +300,8 @@ def exporter(donnees, nom_logiciel="Arboriane", avec_medias=True):
             lignes.append(_ligne(1, "ASSO", "@%s@" % aid))
             if a.get("relation"):
                 _ajouter(lignes, 2, "RELA", a["relation"])
+        if (ind.get("filiation") or "").strip():
+            lignes.append(_ligne(1, "_FIL", ind["filiation"].strip()))
         if (ind.get("refn") or "").strip():
             lignes.append(_ligne(1, "REFN", ind["refn"].strip()))
         if (ind.get("resn") or "").strip():

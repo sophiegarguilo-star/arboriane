@@ -516,6 +516,7 @@ function detailsIdentite(f) {
   if ((f.prenom_principal || "").trim()) bouts.push(["Prénom usuel", f.prenom_principal.trim()]);
   if ((f.surnom || "").trim()) bouts.push(["Dit", "« " + f.surnom.trim() + " »"]);
   if ((f.nom_marital || "").trim()) bouts.push(["Nom marital", f.nom_marital.trim()]);
+  if ((f.filiation || "").trim()) bouts.push(["Filiation", f.filiation.trim()]);
   const variantes = (f.noms_alternatifs || []).map((v) => {
     const nom = [v.prenoms, v.nom].filter(Boolean).join(" ").trim();
     const t = TYPE_NOM_LABEL[v.type];
