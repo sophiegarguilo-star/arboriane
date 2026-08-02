@@ -2,6 +2,7 @@
 // main (pan), galerie (←/→), transcription à côté (lecture + édition).
 import { h, vider } from "../noyau/dom.js";
 import { toast } from "./toast.js";
+import { editeurRiche, rendreTranscription } from "./editeur_riche.js";
 
 let _fermer = null;
 
@@ -89,18 +90,30 @@ export function ouvrirVisionneuse(images, opts = {}) {
     h("button", { class: "visio-btn", title: "Zoom +", onclick: () => zoomer(1.25) }, "🔍+"),
     h("button", { class: "visio-btn", title: "Fermer (Échap)", onclick: fermerVisionneuse }, "✕"));
 
-  // panneau transcription (optionnel)
+  // panneau transcription (optionnel). opts.editeur : réglage « éditeur enrichi ».
   let panneau = null;
   if (opts.transcription != null || opts.onTranscription) {
-    const zone = h("textarea", { class: "visio-trans-txt", rows: 20,
-      placeholder: "Transcription de l'acte…" }, opts.transcription || "");
-    zone.readOnly = !opts.onTranscription;
+    let lireTrans = null, elemTrans = null;
+    if (!opts.onTranscription) {
+      // Lecture seule : rendu sûr (HTML autorisé assaini, ou texte échappé).
+      elemTrans = rendreTranscription(opts.transcription || "");
+      elemTrans.classList.add("visio-trans-txt");
+    } else if (opts.editeur) {
+      const ed = editeurRiche({ html: opts.transcription || "" });
+      lireTrans = () => ed.getHtml();
+      elemTrans = ed.element;
+    } else {
+      const zone = h("textarea", { class: "visio-trans-txt", rows: 20,
+        placeholder: "Transcription de l'acte…" }, opts.transcription || "");
+      lireTrans = () => zone.value;
+      elemTrans = zone;
+    }
     let btnSave = null;
     if (opts.onTranscription) {
       btnSave = h("button", { class: "bouton petit", onclick: async () => {
         btnSave.disabled = true;
         try {
-          await opts.onTranscription(zone.value);
+          await opts.onTranscription(lireTrans());
           btnSave.textContent = "✓ Enregistré";
           setTimeout(() => {
             btnSave.textContent = "Enregistrer la transcription"; btnSave.disabled = false;
@@ -110,7 +123,7 @@ export function ouvrirVisionneuse(images, opts = {}) {
     }
     const actions = btnSave ? h("div", { class: "barre-actions" }, btnSave) : null;
     panneau = h("div", { class: "visio-trans" },
-      h("h3", {}, "Transcription"), zone, actions);
+      h("h3", {}, "Transcription"), elemTrans, actions);
   }
 
   const corps = h("div", { class: "visio-corps" }, scene, panneau);

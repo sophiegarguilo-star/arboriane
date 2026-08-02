@@ -612,4 +612,7 @@ class Application:
             "geocodage_ok": bool(r.get("geocodage_ok")),
             "pays_defaut": r.get("pays_defaut") or "",
             "navigateur": r.get("navigateur") or "",
+            # Éditeur enrichi (mini WYSIWYG) pour les transcriptions : opt-in,
+            # désactivé par défaut pour ne pas surprendre les arbres existants.
+            "editeur_riche": bool(r.get("editeur_riche")),
         }

@@ -94,6 +94,25 @@ export async function vueReglages(vue) {
         "Ajouté à la recherche d'un lieu qui n'indique pas de pays. "
         + "Utile si votre arbre est surtout dans un pays."))));
 
+  // Éditeur enrichi des transcriptions (opt-in, désactivé par défaut)
+  const chkEdit = h("input", { type: "checkbox", checked: r.editeur_riche ? "checked" : null });
+  chkEdit.addEventListener("change", async () => {
+    try {
+      await apiJson("/api/reglages", "PUT", { editeur_riche: chkEdit.checked });
+      toast(chkEdit.checked ? "Éditeur enrichi activé." : "Éditeur enrichi désactivé.");
+    } catch (e) { chkEdit.checked = !chkEdit.checked; toast(e.message); }
+  });
+  vue.append(h("div", { class: "carte" },
+    h("h2", {}, "✎ Éditeur des transcriptions"),
+    h("p", { class: "sous-titre" },
+      "Désactivé par défaut : la transcription se saisit dans une simple zone de "
+      + "texte. Si vous l'activez, une petite barre d'outils (gras, italique, "
+      + "souligné, listes) apparaît pour mettre en forme la transcription. "
+      + "À l'export GEDCOM, la mise en forme est retirée : le fichier ne contient "
+      + "que du texte simple, sans balise."),
+    h("label", { style: "display:flex;align-items:center;gap:8px" }, chkEdit,
+      "Utiliser l'éditeur enrichi pour les transcriptions")));
+
   // Navigateur d'ouverture (retour utilisateur : Arboriane force Edge)
   const selNav = h("select", {},
     h("option", { value: "" }, "Automatique (Edge, Chrome ou Firefox)"),

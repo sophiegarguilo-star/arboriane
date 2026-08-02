@@ -8,7 +8,54 @@ import re
 from core import modele
 from core.gedcom.commun import *
 
-__all__ = ["_lire_note", "_retirer_repli_source", "_citations", "_lire_coords", "_MOIS_REP_GED", "_MON_GREG", "_normaliser_date", "_evenement", "_lieu_depuis_addr", "_evenement_generique", "_nom"]
+__all__ = ["_lire_note", "_retirer_repli_source", "_citations", "_lire_coords", "_MOIS_REP_GED", "_MON_GREG", "_normaliser_date", "_evenement", "_lieu_depuis_addr", "_evenement_generique", "_nom", "html_vers_texte"]
+
+# Balise HTML « ouvrante/fermante/auto-fermante » quelconque.
+_BALISE = re.compile(r"<[^>]+>")
+# Balises qui, à la fermeture (ou en auto-fermeture pour <br>), valent un saut de ligne.
+_SAUT = re.compile(r"</?(?:br|p|div|li|tr)\s*/?>", re.IGNORECASE)
+# Ouverture d'un <li …> : on préfixe la puce par « - ».
+_LI_OUVRE = re.compile(r"<li(?:\s[^>]*)?>", re.IGNORECASE)
+# Détection rapide « y a-t-il au moins une balise ? »
+_A_BALISE = re.compile(r"<[a-zA-Z/][^>]*>")
+
+
+def html_vers_texte(s):
+    """Convertit une transcription HTML (éditeur enrichi) en TEXTE SIMPLE, pour
+    qu'AUCUNE balise n'atteigne un fichier GEDCOM exporté (« pas de panique à
+    l'export »).
+
+    Règles : <br>, </p>, </div>, </li> → saut de ligne ; <li> → « - » en tête de
+    la puce ; toutes les autres balises sont retirées ; les entités (&amp; &lt;
+    &gt; &nbsp; …) sont décodées. Si l'entrée ne contient aucune balise, elle est
+    renvoyée telle quelle (texte simple existant intact)."""
+    if not s:
+        return s
+    if not _A_BALISE.search(s):
+        return s            # texte simple : rien à convertir (aller-retour intact)
+    t = s.replace("\r\n", "\n").replace("\r", "\n")
+    # 1) puces : « - » devant chaque <li …>
+    t = _LI_OUVRE.sub("\n- ", t)
+    # 2) sauts de ligne pour br / p / div / li (fermetures) / tr
+    t = _SAUT.sub("\n", t)
+    # 3) retrait de toute autre balise
+    t = _BALISE.sub("", t)
+    # 4) décodage des entités (&amp; &nbsp; …)
+    t = html.unescape(t).replace("\xa0", " ")
+    # 5) nettoyage : espaces de fin de ligne, lignes vides multiples, bords
+    lignes = [ligne.rstrip() for ligne in t.split("\n")]
+    out = []
+    for i, ligne in enumerate(lignes):
+        if not ligne and out and not out[-1]:
+            continue        # pas plus d'une ligne vide d'affilée
+        # une ligne vide juste avant une puce vient du couple </li>+<li> : on la
+        # supprime pour ne pas espacer les puces d'une liste.
+        if not ligne:
+            suivante = lignes[i + 1] if i + 1 < len(lignes) else ""
+            if suivante.lstrip().startswith("- "):
+                continue
+        out.append(ligne)
+    return "\n".join(out).strip()
 
 def _lire_note(noeud):
     """Lit un noeud NOTE en suivant un éventuel pointeur (1 NOTE @NT..@),

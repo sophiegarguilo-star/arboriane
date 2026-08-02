@@ -90,6 +90,8 @@ def reglages_ecrire(app, params, corps):
         champs["ia_cle"] = corps["ia_cle"].strip()
     if "geocodage_ok" in corps:
         champs["geocodage_ok"] = bool(corps["geocodage_ok"])
+    if "editeur_riche" in corps:
+        champs["editeur_riche"] = bool(corps["editeur_riche"])
     if "pays_defaut" in corps:
         champs["pays_defaut"] = (corps.get("pays_defaut") or "").strip()[:80]
     if "navigateur" in corps:

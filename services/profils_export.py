@@ -64,6 +64,8 @@ Bibliothèque standard uniquement (copy). Aucune dépendance externe.
 import copy
 import re
 
+from core.gedcom.champs import html_vers_texte
+
 from core import modele
 
 
@@ -96,7 +98,9 @@ def _resume(transcription):
 
 def _texte_transcription(src, complete):
     """Transcription à replier : intégrale si `complete`, sinon résumé court."""
-    trans = (src.get("transcription") or "").strip()
+    # Conversion HTML → texte simple : l'éditeur enrichi peut avoir stocké du
+    # HTML ; aucune balise ne doit atteindre le GEDCOM replié dans une note.
+    trans = html_vers_texte(src.get("transcription") or "").strip()
     if not trans:
         return ""
     return trans if complete else _resume(trans)

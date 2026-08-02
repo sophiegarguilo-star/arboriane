@@ -12,6 +12,7 @@
 import { h, vider } from "../../noyau/dom.js";
 import { aller } from "../../noyau/etat.js";
 import { apiGet, apiJson } from "../../noyau/api.js";
+import { editeurRiche } from "../../composants/editeur_riche.js";
 import { toast } from "../../composants/toast.js";
 import { champSource } from "../../composants/champSource.js";
 import { champLieu, chargerLieux } from "../../composants/champLieu.js";
@@ -37,6 +38,8 @@ export async function formulaire(src, opts = {}) {
   vue.append(h("h1", {}, edit ? "Modifier la source"
     : (preuve ? "Prouver : " + preuve.libelle : "Nouvelle source")));
   src = src || {};
+  const reglages = await apiGet("/api/reglages").catch(() => ({}));
+  const editeurActif = !!reglages.editeur_riche;
 
   // Les scans déposés ici puis abandonnés (annulation / retour) sont effacés du
   // disque par le bloc « pièces jointes » — sauf si la source a été enregistrée.
@@ -229,10 +232,22 @@ export async function formulaire(src, opts = {}) {
       "Le titre décrit la source dans vos listes. Le nom du fichier, lui, sert à "
       + "ranger le scan sur votre disque : ce sont deux choses différentes.")));
 
-  const transSrc = h("textarea", { rows: 14,
-    style: "width:100%;min-height:240px;resize:vertical;line-height:1.5",
-    placeholder: "Transcription de l'acte…" }, src.transcription || "");
-  carte.append(h("div", { class: "champ" }, h("label", {}, "Transcription"), transSrc));
+  // Transcription : éditeur enrichi (réglage ON) ou zone de texte simple.
+  let lireTranscription, elemTranscription;
+  if (editeurActif) {
+    const ed = editeurRiche({ html: src.transcription || "" });
+    lireTranscription = () => ed.getHtml().trim();
+    elemTranscription = ed.element;
+  } else {
+    const transSrc = h("textarea", { rows: 14,
+      style: "width:100%;min-height:240px;resize:vertical;line-height:1.5",
+      placeholder: "Transcription de l'acte…" }, src.transcription || "");
+    lireTranscription = () => transSrc.value.trim();
+    elemTranscription = transSrc;
+  }
+  carte.append(h("div", { class: "champ" },
+    h("label", {}, "Transcription"),
+    elemTranscription));
 
   // ── Nomenclature : le serveur propose, l'écran affiche ───────────────
   let propositions = [];              // [{origine, propose}] pour les scans AJOUTÉS ici
@@ -314,7 +329,7 @@ export async function formulaire(src, opts = {}) {
     else if (dv) { const d = depots.find((x) => x.id === dv); corps.depot = d ? (d.nom || "") : ""; corps.depot_id = dv; }
     else { corps.depot = ""; corps.depot_id = ""; }
     corps.fichiers = blocFichiers.fichiers();
-    corps.transcription = transSrc.value.trim();
+    corps.transcription = lireTranscription();
     // personnes citées : réécrites en bloc, donc jamais de doublon de rôle
     corps.personnes = blocGens.valeurs();
     return corps;

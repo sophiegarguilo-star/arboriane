@@ -10,11 +10,14 @@ import { confirmer, demander } from "../../composants/modale.js";
 import { champPersonne } from "../../composants/champ.js";
 import { formatNonAffichable, MSG_FORMAT_NON_AFFICHABLE } from "../../composants/media.js";
 import { lireBase64 } from "./commun.js";
+import { editeurRiche } from "../../composants/editeur_riche.js";
 import { formulaire } from "./formulaire.js";
 
 export async function detail(sid) {
   const s = await apiGet("/api/sources/" + sid).catch(() => null);
   if (!s) { toast("Source introuvable."); return; }
+  const reglages = await apiGet("/api/reglages").catch(() => ({}));
+  const editeurActif = !!reglages.editeur_riche;
   const vue = document.getElementById("vue");
   vider(vue);
   // Retour vers l'écran d'où l'on vient (fiche personne, liste, recherche,
@@ -53,7 +56,7 @@ export async function detail(sid) {
   let majTrans = null;   // synchronise le champ de la fiche quand on sauve depuis la visionneuse
   function ouvrir(url) {
     ouvrirVisionneuse(images, { index: Math.max(0, images.indexOf(url)), titre: s.titre,
-      transcription: s.transcription || "",
+      transcription: s.transcription || "", editeur: editeurActif,
       onTranscription: async (txt) => {
         await apiJson("/api/sources/" + sid, "PUT", { transcription: txt });
         s.transcription = txt;
@@ -145,23 +148,38 @@ export async function detail(sid) {
   viz.append(h("div", { style: "margin-top:10px" }, drop));
 
   // transcription éditable — avec confirmation visible « ✓ Enregistré »
-  const trans = h("textarea", { rows: 6, style: "width:100%;margin-top:10px",
-    placeholder: "Transcription de l'acte…" }, s.transcription || "");
   const statutTrans = h("span", { style: "font-size:13px;color:var(--vert)" });
   const marqueEnr = () => { statutTrans.textContent = "✓ Enregistré"; statutTrans.style.color = "var(--vert)"; };
   const marqueMod = () => {
     statutTrans.textContent = "● Modifié — non enregistré"; statutTrans.style.color = "var(--gris)";
   };
-  trans.addEventListener("input", marqueMod);
-  majTrans = (v) => { trans.value = v; marqueEnr(); };   // appelé depuis la visionneuse
+  // Selon le réglage : éditeur enrichi (mini WYSIWYG) OU zone de texte simple.
+  // Les deux exposent lireTrans()/majTransZone(v) pour un enregistrement unifié.
+  let lireTrans, elemTrans;
+  if (editeurActif) {
+    const ed = editeurRiche({ html: s.transcription || "", onInput: marqueMod });
+    lireTrans = () => ed.getHtml();
+    majTrans = (v) => { ed.setHtml(v); marqueEnr(); };   // appelé depuis la visionneuse
+    elemTrans = ed.element;
+  } else {
+    const trans = h("textarea", { rows: 14,
+      style: "width:100%;min-height:240px;resize:vertical;line-height:1.5",
+      placeholder: "Transcription de l'acte…" }, s.transcription || "");
+    trans.addEventListener("input", marqueMod);
+    lireTrans = () => trans.value;
+    majTrans = (v) => { trans.value = v; marqueEnr(); };   // appelé depuis la visionneuse
+    elemTrans = trans;
+  }
   const btnTrans = h("button", { class: "bouton secondaire petit", onclick: async () => {
     btnTrans.disabled = true;
     try {
-      await apiJson("/api/sources/" + sid, "PUT", { transcription: trans.value });
-      s.transcription = trans.value; toast("Transcription enregistrée."); marqueEnr();
+      const val = lireTrans();
+      await apiJson("/api/sources/" + sid, "PUT", { transcription: val });
+      s.transcription = val; toast("Transcription enregistrée."); marqueEnr();
     } catch (e) { toast(e.message); } finally { btnTrans.disabled = false; }
   } }, "Enregistrer la transcription");
-  viz.append(h("label", { style: "margin-top:12px" }, "Transcription"), trans,
+  viz.append(h("label", { style: "margin-top:12px" }, "Transcription"),
+    h("div", { style: "margin-top:6px" }, elemTrans),
     h("div", { class: "barre-actions", style: "align-items:center;gap:10px;margin-top:6px" },
       btnTrans, statutTrans));
   vue.append(viz);

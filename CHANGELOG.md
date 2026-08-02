@@ -9,6 +9,11 @@ Toutes les versions notables d'Arboriane. Format inspiré de
 > `python -X utf8 outils/generer_changelog.py`.
 
 
+## [1.10.3](https://github.com/sophiegarguilo-star/arboriane/releases/tag/v1.10.3) — 2026-08-02
+
+- Éditeur enrichi pour les transcriptions : une petite barre d'outils (gras, italique, souligné, listes) permet désormais de mettre en forme le texte d'un acte. Elle s'active ou se désactive à votre choix dans Réglages (désactivée par défaut) — sans elle, la zone de saisie reste un simple champ texte comme avant.
+- À l'export GEDCOM, la mise en forme est automatiquement reconvertie en texte simple : vos fichiers restent propres et lisibles par tous les logiciels et sites, sans balises parasites.
+
 ## [1.10.2](https://github.com/sophiegarguilo-star/arboriane/releases/tag/v1.10.2) — 2026-07-29
 
 - Classement des documents : le classement d'une source par famille et sous-famille (par exemple « Santé, décès et mémoire funéraire › Décès et sépulture ») est désormais mémorisé tel quel. Auparavant, si l'on ne descendait pas jusqu'à un type précis, le classement pouvait revenir en arrière à la réouverture — c'est corrigé.

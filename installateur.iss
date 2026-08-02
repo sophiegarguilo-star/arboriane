@@ -11,7 +11,7 @@
 ; ============================================================================
 
 #define AppName "Arboriane"
-#define AppVersion "1.10.2"
+#define AppVersion "1.10.3"
 #define AppPublisher "Arboriane"
 #define AppExe "Arboriane.exe"
 

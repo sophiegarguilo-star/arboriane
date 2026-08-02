@@ -6,6 +6,7 @@ import re
 
 from core import modele
 from core.gedcom.commun import *
+from core.gedcom.champs import html_vers_texte
 
 def _date_gedcom(valeur):
     """Traduit une date INTERNE (français : « 20/07/1984 », « vers 1850 ») en
@@ -378,7 +379,8 @@ def exporter(donnees, nom_logiciel="Arboriane", avec_medias=True):
         if src.get("auteur"):
             _ajouter(lignes, 1, "AUTH", src["auteur"])
         typ, dat, lieu = src.get("type", ""), src.get("date", ""), src.get("lieu", "")
-        if typ or (src.get("transcription") or "").strip():
+        trans_txt = html_vers_texte(src.get("transcription") or "").strip()
+        if typ or trans_txt:
             # place standard : SOUR.DATA.EVEN(.DATE/.PLAC) + DATA.TEXT (transcription)
             lignes.append(_ligne(1, "DATA"))
             if typ:
@@ -387,8 +389,8 @@ def exporter(donnees, nom_logiciel="Arboriane", avec_medias=True):
                     lignes.append(_ligne(3, "DATE", _date_gedcom(dat)))
                 if lieu:
                     lignes.append(_ligne(3, "PLAC", lieu))
-            if (src.get("transcription") or "").strip():
-                _ecrire_tag_texte(lignes, 2, "TEXT", src["transcription"].strip())
+            if trans_txt:
+                _ecrire_tag_texte(lignes, 2, "TEXT", trans_txt)
         if src.get("abbr"):
             _ajouter(lignes, 1, "ABBR", src["abbr"])
         if src.get("publ"):

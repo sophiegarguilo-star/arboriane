@@ -25,6 +25,16 @@ PAGE = "https://sophiegarguilo-star.github.io/arboriane/"
 # Journal des nouveautés, du plus récent au plus ancien. À COMPLÉTER à chaque
 # version livrée (une entrée = ce que l'utilisateur gagne, en clair).
 NOTES = [
+    {"version": "1.10.3", "date": "2026-08-02", "points": [
+        "Éditeur enrichi pour les transcriptions : une petite barre d'outils "
+        "(gras, italique, souligné, listes) permet désormais de mettre en forme "
+        "le texte d'un acte. Elle s'active ou se désactive à votre choix dans "
+        "Réglages (désactivée par défaut) — sans elle, la zone de saisie reste "
+        "un simple champ texte comme avant.",
+        "À l'export GEDCOM, la mise en forme est automatiquement reconvertie en "
+        "texte simple : vos fichiers restent propres et lisibles par tous les "
+        "logiciels et sites, sans balises parasites.",
+    ]},
     {"version": "1.10.2", "date": "2026-07-29", "points": [
         "Classement des documents : le classement d'une source par famille et "
         "sous-famille (par exemple « Santé, décès et mémoire funéraire › Décès "
