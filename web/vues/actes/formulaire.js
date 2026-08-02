@@ -62,7 +62,14 @@ export async function formulaire(src, opts = {}) {
     return null;
   }
   const chaine = chaineDe(src.type);
+  // La famille / sous-famille sont MÉMORISÉES sur la source : on peut classer à
+  // ce niveau sans descendre jusqu'à un type précis. Repli sur chaineDe(type)
+  // pour les sources anciennes qui n'ont que le type.
+  const famIni = src.famille || (chaine && chaine.fam) || "";
+  const sfIni = src.sous_famille || (chaine && chaine.sf) || "";
   const typeConnu = !src.type || !!chaine;   // un type hors taxonomie -> « Autre »
+  let premierRendu = true;   // « Autre » n'est présélectionné qu'au 1er affichage
+  // (sinon, en changeant de famille, un ancien type libre restait collé).
   const opt = (v, txt, sel) => h("option", { value: v, selected: sel ? "selected" : null }, txt);
 
   const selFam = h("select", { style: "flex:1;min-width:170px" });
@@ -75,14 +82,14 @@ export async function formulaire(src, opts = {}) {
   function remplirFam() {
     vider(selFam);
     selFam.append(opt("", "— Famille —", false));
-    taxo.forEach((f) => selFam.append(opt(f.famille, f.famille, chaine && chaine.fam === f.famille)));
+    taxo.forEach((f) => selFam.append(opt(f.famille, f.famille, famIni === f.famille)));
   }
   function remplirSF() {
     vider(selSF);
     const f = taxo.find((x) => x.famille === selFam.value);
     selSF.append(opt("", "— Sous-famille —", false));
     (f ? f.sous : []).forEach((s) =>
-      selSF.append(opt(s.sous_famille, s.sous_famille, chaine && chaine.sf === s.sous_famille)));
+      selSF.append(opt(s.sous_famille, s.sous_famille, sfIni === s.sous_famille)));
   }
   function remplirType() {
     vider(selType);
@@ -90,7 +97,7 @@ export async function formulaire(src, opts = {}) {
     const s = f ? f.sous.find((y) => y.sous_famille === selSF.value) : null;
     selType.append(opt("", "— Type précis —", false));
     (s ? s.types : []).forEach((ty) => selType.append(opt(ty.type, ty.type, src.type === ty.type)));
-    selType.append(opt("__autre__", "Autre (à préciser)…", !typeConnu));
+    selType.append(opt("__autre__", "Autre (à préciser)…", premierRendu && !typeConnu));
   }
   function majAutre() {
     inAutre.style.display = selType.value === "__autre__" ? "" : "none";
@@ -100,6 +107,7 @@ export async function formulaire(src, opts = {}) {
   selSF.addEventListener("change", () => { remplirType(); majAutre(); rafraichir(); });
   selType.addEventListener("change", () => { majAutre(); rafraichir(); });
   remplirFam(); remplirSF(); remplirType(); majAutre();
+  premierRendu = false;   // à partir d'ici, changer de famille ne recolle plus « Autre »
 
   champs.type = selType;   // écrasé par lireType() au save (ligne « corps.type = … »)
   // Valeur réelle du type : le champ libre si « Autre… », sinon le type-feuille.
@@ -221,7 +229,8 @@ export async function formulaire(src, opts = {}) {
       "Le titre décrit la source dans vos listes. Le nom du fichier, lui, sert à "
       + "ranger le scan sur votre disque : ce sont deux choses différentes.")));
 
-  const transSrc = h("textarea", { rows: 6, style: "width:100%",
+  const transSrc = h("textarea", { rows: 14,
+    style: "width:100%;min-height:240px;resize:vertical;line-height:1.5",
     placeholder: "Transcription de l'acte…" }, src.transcription || "");
   carte.append(h("div", { class: "champ" }, h("label", {}, "Transcription"), transSrc));
 
@@ -296,6 +305,8 @@ export async function formulaire(src, opts = {}) {
     const corps = {};
     Object.entries(champs).forEach(([k, el]) => corps[k] = el.value.trim());
     corps.type = lireType();              // « Autre… » -> type personnalisé saisi
+    corps.famille = selFam.value;         // classement mémorisé même sans type précis
+    corps.sous_famille = selSF.value;
     corps.lieu = champLieuSrc.valeur();   // lieu avec autocomplétion
     // dépôt : entité choisie (depot_id + nom synchronisé) ou saisie libre
     const dv = selDepot.value;

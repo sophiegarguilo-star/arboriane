@@ -9,6 +9,12 @@ Toutes les versions notables d'Arboriane. Format inspiré de
 > `python -X utf8 outils/generer_changelog.py`.
 
 
+## [1.10.2](https://github.com/sophiegarguilo-star/arboriane/releases/tag/v1.10.2) — 2026-07-29
+
+- Classement des documents : le classement d'une source par famille et sous-famille (par exemple « Santé, décès et mémoire funéraire › Décès et sépulture ») est désormais mémorisé tel quel. Auparavant, si l'on ne descendait pas jusqu'à un type précis, le classement pouvait revenir en arrière à la réouverture — c'est corrigé.
+- Nouveaux types sous « Décès et sépulture » : « Faire-part ou avis de décès » et « Article de presse (nécrologie, obsèques) », pratiques pour classer les coupures de presse liées à un décès.
+- La zone de transcription d'un acte est plus grande et redimensionnable — plus confortable pour saisir de longs textes ou des articles de presse.
+
 ## [1.10.1](https://github.com/sophiegarguilo-star/arboriane/releases/tag/v1.10.1) — 2026-07-29
 
 - Import de fichiers venant d'autres logiciels (Heredis en particulier) : les tags techniques du logiciel d'origine — date de création ou de mise à jour d'une fiche — ne sont plus importés comme des lignes dans « Vie & chronologie », où ils n'avaient pas leur place.

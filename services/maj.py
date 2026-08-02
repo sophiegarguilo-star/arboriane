@@ -25,6 +25,18 @@ PAGE = "https://sophiegarguilo-star.github.io/arboriane/"
 # Journal des nouveautés, du plus récent au plus ancien. À COMPLÉTER à chaque
 # version livrée (une entrée = ce que l'utilisateur gagne, en clair).
 NOTES = [
+    {"version": "1.10.2", "date": "2026-07-29", "points": [
+        "Classement des documents : le classement d'une source par famille et "
+        "sous-famille (par exemple « Santé, décès et mémoire funéraire › Décès "
+        "et sépulture ») est désormais mémorisé tel quel. Auparavant, si l'on "
+        "ne descendait pas jusqu'à un type précis, le classement pouvait revenir "
+        "en arrière à la réouverture — c'est corrigé.",
+        "Nouveaux types sous « Décès et sépulture » : « Faire-part ou avis de "
+        "décès » et « Article de presse (nécrologie, obsèques) », pratiques pour "
+        "classer les coupures de presse liées à un décès.",
+        "La zone de transcription d'un acte est plus grande et redimensionnable "
+        "— plus confortable pour saisir de longs textes ou des articles de presse.",
+    ]},
     {"version": "1.10.1", "date": "2026-07-29", "points": [
         "Import de fichiers venant d'autres logiciels (Heredis en particulier) : "
         "les tags techniques du logiciel d'origine — date de création ou de "

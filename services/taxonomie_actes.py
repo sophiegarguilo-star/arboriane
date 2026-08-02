@@ -166,6 +166,8 @@ FAMILLES = [
      ("Permis d'inhumer ou de transport de corps", "INH"),
      ("Registre de cimetière ou d'inhumation", "CIM"),
      ("Acte ou titre de concession funéraire", "CONC"),
+     ("Faire-part ou avis de décès", "AVD"),
+     ("Article de presse (nécrologie, obsèques)", "NEC"),
      ("Photographie ou relevé de tombe", "TOMB"),
    ]),
  ]),

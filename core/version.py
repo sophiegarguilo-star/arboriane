@@ -10,7 +10,7 @@ Format : MAJEUR.MINEUR.CORRECTIF (entiers). BUILD est une chaîne courte
 comparable côté navigateur pour détecter un backend d'une autre version.
 """
 
-VERSION = "1.10.1"
+VERSION = "1.10.2"
 
 # Empreinte de build servie au navigateur (handshake anti-cache).
 # = la version ; suffit à détecter « le serveur a changé, recharge ».

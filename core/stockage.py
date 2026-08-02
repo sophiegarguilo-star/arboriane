@@ -543,6 +543,10 @@ class Base:
         "titre", "type", "date", "lieu", "ville", "pays", "auteur", "depot",
         "depot_id", "cote", "page", "publ", "ark", "fiabilite", "statut", "note",
         "transcription", "fichier", "fichiers", "personnes",
+        # Classement taxonomique retenu par l'utilisateur : mémorisé tel quel
+        # pour qu'un classement au niveau famille / sous-famille TIENNE même sans
+        # descendre jusqu'à un type précis (ex. coupure de presse).
+        "famille", "sous_famille",
         # Descripteurs du document (propriétés, pas des types) — choix « nom court ».
         "forme", "completude", "visibilite",
     )
