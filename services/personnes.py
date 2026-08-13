@@ -151,6 +151,9 @@ def fiche(base, pid, racine_id=None):
         conjoint_id = fam.get("epouse") if fam.get("mari") == pid else fam.get("mari")
         unions.append({
             "famille": fid,
+            # Créneau occupé par le CONJOINT (pas par pid) : le frontend sait ainsi
+            # quel rôle remplacer/retirer quand on change de conjoint·e.
+            "role_conjoint": "epouse" if fam.get("mari") == pid else "mari",
             "conjoint": _mini(base, conjoint_id) if conjoint_id else None,
             "mariage": fam.get("mariage") or {},
             # Événements du couple (divorce, fiançailles, contrat…). Sans eux, un

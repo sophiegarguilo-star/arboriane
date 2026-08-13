@@ -88,6 +88,38 @@ def ajouter_enfant_famille(app, params, corps, fid):
     return {"ok": True, "id": enfant_id}
 
 
+@route("PUT", r"^/api/familles/(?P<fid>[A-Za-z0-9]+)/conjoint$")
+def remplacer_conjoint(app, params, corps, fid):
+    """Remplace (ou retire, `id` absent/vide) un parent d'une union PRÉCISE.
+    Corps : {role: 'mari'|'epouse', id?}."""
+    base = _base(app)
+    if fid not in base.donnees["familles"]:
+        return (404, {"erreur": "Famille introuvable."})
+    role = corps.get("role")
+    if role not in ("mari", "epouse"):
+        return (400, {"erreur": "Rôle invalide."})
+    fam = base.remplacer_conjoint(fid, role, corps.get("id") or "")
+    if fam is None:
+        return (400, {"erreur": "Modification impossible."})
+    return {"ok": True}
+
+
+@route("POST", r"^/api/individus/(?P<eid>[A-Za-z0-9]+)/deplacer$")
+def deplacer_enfant(app, params, corps, eid):
+    """Déplace un enfant vers une autre famille (`famille` = fid) ou le détache
+    de tout couple (`famille` vide)."""
+    base = _base(app)
+    _verifier_pid(base, eid)
+    fid = corps.get("famille") or ""
+    if fid:
+        if fid not in base.donnees["familles"]:
+            return (404, {"erreur": "Famille introuvable."})
+        base.ajouter_enfant_famille(fid, eid)
+    else:
+        base.definir_parents(eid, "", "")
+    return {"ok": True}
+
+
 @route("PUT", r"^/api/familles/(?P<fid>[A-Za-z0-9]+)$")
 def modifier_famille(app, params, corps, fid):
     fam = _base(app).modifier_famille(fid, corps)

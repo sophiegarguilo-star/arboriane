@@ -9,6 +9,11 @@ Toutes les versions notables d'Arboriane. Format inspiré de
 > `python -X utf8 outils/generer_changelog.py`.
 
 
+## [1.10.4](https://github.com/sophiegarguilo-star/arboriane/releases/tag/v1.10.4) — 2026-08-02
+
+- Onglet Famille : on peut désormais modifier les liens directement là où on les voit. À côté de chaque parent, conjoint·e et enfant, de petits boutons permettent de « ✎ Changer » (remplacer la personne) ou « ✕ Retirer » un parent ou un conjoint·e.
+- Chaque enfant a un menu « ⋯ » pour « Changer sa mère », « Changer son père » ou « Détacher de ce couple » — pratique, par exemple, quand des enfants ont été rattachés au mauvais parent (remariages, deux sœurs épousées par deux frères…). Le second parent est conservé et l'enfant bascule automatiquement dans le bon couple.
+
 ## [1.10.3](https://github.com/sophiegarguilo-star/arboriane/releases/tag/v1.10.3) — 2026-08-02
 
 - Éditeur enrichi pour les transcriptions : une petite barre d'outils (gras, italique, souligné, listes) permet désormais de mettre en forme le texte d'un acte. Elle s'active ou se désactive à votre choix dans Réglages (désactivée par défaut) — sans elle, la zone de saisie reste un simple champ texte comme avant.

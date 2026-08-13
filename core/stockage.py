@@ -445,6 +445,42 @@ class Base:
         return self._rattacher_enfant(fam, enfant_id)
 
     @_synchronise
+    def remplacer_conjoint(self, fid, role, nouveau_id):
+        """Remplace (ou retire, `nouveau_id=""`) EN PLACE un parent d'une union.
+
+        On conserve enfants, mariage et événements de la famille `fid` : seul le
+        créneau `role` (« mari » ou « epouse ») change. On ne fusionne PAS avec
+        une éventuelle autre famille du nouveau couple (hors périmètre)."""
+        if role not in ("mari", "epouse"):
+            return None
+        fam = self.donnees["familles"].get(fid)
+        if not fam:
+            return None
+        nouveau_id = nouveau_id or ""
+        if nouveau_id:
+            if nouveau_id not in self.donnees["individus"]:
+                return None
+            # Interdire un couple d'une personne avec elle-même (déjà dans l'AUTRE rôle).
+            autre = "epouse" if role == "mari" else "mari"
+            if fam.get(autre) == nouveau_id:
+                return None
+        ancien = fam.get(role) or ""
+        if ancien == nouveau_id:
+            return fam
+        fam[role] = nouveau_id
+        if ancien:                                      # détacher l'ancien
+            anc = self.donnees["individus"].get(ancien)
+            if anc and fid in anc.get("fams", []):
+                anc["fams"] = [x for x in anc["fams"] if x != fid]
+        if nouveau_id:                                  # rattacher le nouveau
+            nouv = self.donnees["individus"].get(nouveau_id)
+            if nouv and fid not in nouv.get("fams", []):
+                nouv.setdefault("fams", []).append(fid)
+        self._nettoyer_familles_vides()
+        self.sauvegarder()
+        return fam
+
+    @_synchronise
     def ajouter_enfant_famille(self, fid, enfant_id):
         """Ajoute un enfant à une FAMILLE précise (bouton « ＋ enfant » d'une
         union donnée) — sans jamais retomber sur `fams[0]`."""

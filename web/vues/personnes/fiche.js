@@ -5,7 +5,8 @@ import { aller, retour, peutRevenir } from "../../noyau/etat.js";
 import { apiGet, apiJson } from "../../noyau/api.js";
 import { badge, pastilleSexe } from "../../composants/badge.js";
 import { toast } from "../../composants/toast.js";
-import { confirmer, ouvrirModale, fermerModale } from "../../composants/modale.js";
+import { confirmer, choix, ouvrirModale, fermerModale } from "../../composants/modale.js";
+import { champPersonne } from "../../composants/champ.js";
 import { noterRecent } from "../../noyau/recents.js";
 import { blocLiensWeb } from "../../composants/liensWeb.js";
 import { RESN_LABEL, TYPE_NOM_LABEL, majuscule, brancheDeSosa,
@@ -20,6 +21,78 @@ import { sectionChronologie, sectionPistes, sectionDocuments, sectionPreuves,
 function ajoutRelatif(pid, type, nom, fid) {
   aller("personnes", { creer: true,
     lien: { type, ancre: pid, ancreNom: nom, famille: fid || null } });
+}
+
+// Petite modale « choisir une personne existante » : renvoie l'id choisi, ou
+// null (Annuler / Échap / fond). Résolution unique (motif des modales du projet).
+async function choisirPersonne({ titre = "Choisir une personne", exclureId = null } = {}) {
+  let liste = [];
+  try { liste = await apiGet("/api/individus"); } catch { liste = []; }
+  if (exclureId) liste = liste.filter((p) => p.id !== exclureId);
+  return new Promise((resolve) => {
+    let regle = false;
+    const fond = document.getElementById("modale-fond");
+    const surFond = (e) => { if (e.target === fond) finir(null); };
+    const surTouche = (e) => { if (e.key === "Escape") finir(null); };
+    const finir = (val) => {
+      if (regle) return;
+      regle = true;
+      fond.removeEventListener("click", surFond);
+      document.removeEventListener("keydown", surTouche);
+      fermerModale();
+      resolve(val);
+    };
+    const champ = champPersonne(liste, { placeholder: "Rechercher la personne…" });
+    const valider = () => {
+      const id = champ.valeur();
+      if (!id) { toast("Choisissez d'abord une personne."); return; }
+      finir(id);
+    };
+    const corps = h("div", {},
+      champ.element,
+      h("div", { class: "barre-actions", style: "justify-content:flex-end;margin-top:16px" },
+        h("button", { class: "bouton secondaire", onclick: () => finir(null) }, "Annuler"),
+        h("button", { class: "bouton", onclick: valider }, "Valider")));
+    ouvrirModale(corps, { titre });
+    // Fermeture par clic sur le fond ou Échap = annulation (résout null).
+    fond.addEventListener("click", surFond);
+    document.addEventListener("keydown", surTouche);
+  });
+}
+
+// Recharge l'onglet Famille de la fiche après une mutation réussie (re-rend via
+// le routeur, qui reconstruit proprement la vue sur le bon onglet).
+function rechargerFamille(pid) {
+  aller("personnes", { fiche: pid, onglet: "famille" }, true);
+}
+
+// Menu « Cet enfant… » : corriger sa mère / son père (ancré sur l'enfant, l'autre
+// parent est conservé — cas des deux sœurs) ou le détacher du couple. `pid` = la
+// personne dont on affiche la fiche (pour recharger l'onglet Famille).
+async function menuEnfant(pid, enfant) {
+  const action = await choix(enfant.nom, [
+    { cle: "mere", texte: "Changer sa mère", secondaire: true },
+    { cle: "pere", texte: "Changer son père", secondaire: true },
+    { cle: "detacher", texte: "Détacher de ce couple", danger: true },
+  ], { titre: "Cet enfant…" });
+  if (!action) return;
+  try {
+    if (action === "detacher") {
+      if (!await confirmer("Détacher « " + enfant.nom + " » de ce couple ?"
+        + " (l'enfant reste dans l'arbre, sans parents rattachés)",
+        { titre: "Détacher l'enfant", danger: true, valider: "Détacher" })) return;
+      await apiJson("/api/individus/" + enfant.id + "/deplacer", "POST", { famille: "" });
+      toast("Enfant détaché.");
+    } else {
+      const titre = action === "mere" ? "Nouvelle mère" : "Nouveau père";
+      const id = await choisirPersonne({ titre, exclureId: enfant.id });
+      if (!id) return;
+      await apiJson("/api/individus/" + enfant.id + "/parent", "POST",
+        { role: action, id });
+      toast(action === "mere" ? "Mère corrigée." : "Père corrigé.");
+    }
+    rechargerFamille(pid);
+  } catch (e) { toast(e.message || "Modification impossible."); }
 }
 
 // Le divorce (et les autres faits du couple) vit dans fam.evenements, type GEDCOM « DIV ».
@@ -404,12 +477,52 @@ function panneauFamille(f, pid, conjoints, enfants) {
 function celluleFamiliale(f) {
   const carte = h("div", { class: "carte" }, h("h2", {}, "Cellule familiale"));
   const parents = [...f.peres, ...f.meres];
+  const fidParents = (f.famc || [])[0] || null;   // famille-parents à éditer
   const ligneParents = h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" });
+
+  // Un parent affiché + ses mini-actions (changer / retirer), ancrées sur la
+  // famille-parents (fidParents). `role` = 'mari' (père) ou 'epouse' (mère).
+  function blocParent(p, role, libelle) {
+    const enveloppe = h("span", { style: "display:inline-flex;gap:4px;align-items:center" },
+      pucePersonne(p));
+    if (fidParents) {
+      enveloppe.append(
+        h("button", { class: "bouton secondaire petit", title: "Changer ce parent",
+          onclick: async () => {
+            const id = await choisirPersonne({ titre: "Changer " + libelle, exclureId: f.id });
+            if (!id) return;
+            try {
+              await apiJson("/api/familles/" + fidParents + "/conjoint", "PUT", { role, id });
+              toast("Parent modifié.");
+              rechargerFamille(f.id);
+            } catch (e) { toast(e.message || "Modification impossible."); }
+          } }, "✎"),
+        h("button", { class: "bouton secondaire petit", title: "Retirer ce parent",
+          onclick: async () => {
+            if (!await confirmer("Retirer « " + p.nom + " » comme " + libelle
+              + " de " + f.nom_complet + " ? (la personne reste dans l'arbre)",
+              { titre: "Retirer le parent", danger: true, valider: "Retirer" })) return;
+            try {
+              await apiJson("/api/familles/" + fidParents + "/conjoint", "PUT", { role, id: "" });
+              toast("Parent retiré.");
+              rechargerFamille(f.id);
+            } catch (e) { toast(e.message || "Modification impossible."); }
+          } }, "✕"));
+    }
+    return enveloppe;
+  }
+
   if (parents.length) {
-    parents.forEach((p, i) => {
-      if (i) ligneParents.append(h("span", { style: "color:var(--gris-clair)" }, "×"));
-      ligneParents.append(pucePersonne(p));
-    });
+    let premier = true;
+    const ajouter = (el) => {
+      if (!premier) ligneParents.append(h("span", { style: "color:var(--gris-clair)" }, "×"));
+      premier = false;
+      ligneParents.append(el);
+    };
+    // pères (rôle « mari »), puis mères (rôle « epouse ») — on connaît ainsi le
+    // créneau exact à remplacer, sans se fier à la liste fusionnée.
+    f.peres.forEach((p) => ajouter(blocParent(p, "mari", "le père")));
+    f.meres.forEach((p) => ajouter(blocParent(p, "epouse", "la mère")));
   } else {
     ligneParents.append(h("span", { style: "color:var(--gris-clair)" }, "Parents inconnus"));
   }
@@ -441,8 +554,37 @@ function blocUnion(f, pid, u) {
   const bloc = h("div", { style: "padding:8px 0;border-bottom:1px solid var(--bord)" });
   const m = u.mariage || {};
   bloc.append(h("div", { class: "sur-titre" }, "Conjoint·e"));
-  bloc.append(h("div", { style: "margin:4px 0" },
-    u.conjoint ? pucePersonne(u.conjoint) : h("span", { style: "color:var(--gris-clair)" }, "conjoint·e inconnu·e")));
+  const ligneConjoint = h("div", { style: "margin:4px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap" });
+  if (u.conjoint) {
+    ligneConjoint.append(pucePersonne(u.conjoint));
+    ligneConjoint.append(
+      h("button", { class: "bouton secondaire petit", title: "Changer ce·tte conjoint·e",
+        onclick: async () => {
+          const id = await choisirPersonne({ titre: "Changer le conjoint·e", exclureId: pid });
+          if (!id) return;
+          try {
+            await apiJson("/api/familles/" + u.famille + "/conjoint", "PUT",
+              { role: u.role_conjoint, id });
+            toast("Conjoint·e modifié·e.");
+            rechargerFamille(pid);
+          } catch (e) { toast(e.message || "Modification impossible."); }
+        } }, "✎ Changer"),
+      h("button", { class: "bouton secondaire petit", title: "Retirer ce·tte conjoint·e de l'union",
+        onclick: async () => {
+          if (!await confirmer("Retirer « " + u.conjoint.nom + " » de cette union ?"
+            + " (la personne reste dans l'arbre)",
+            { titre: "Retirer le conjoint·e", danger: true, valider: "Retirer" })) return;
+          try {
+            await apiJson("/api/familles/" + u.famille + "/conjoint", "PUT",
+              { role: u.role_conjoint, id: "" });
+            toast("Conjoint·e retiré·e.");
+            rechargerFamille(pid);
+          } catch (e) { toast(e.message || "Modification impossible."); }
+        } }, "✕ Retirer"));
+  } else {
+    ligneConjoint.append(h("span", { style: "color:var(--gris-clair)" }, "conjoint·e inconnu·e"));
+  }
+  bloc.append(ligneConjoint);
   // Faits du couple, chacun sur sa ligne, dans l'ordre PACS → Mariage → Divorce.
   const ligneFait = (txt) => h("div", { style: "color:var(--gris);font-size:13px;margin:2px 0" }, txt);
   const pac = pacsDe(u);
@@ -460,7 +602,14 @@ function blocUnion(f, pid, u) {
   if (u.enfants.length) {
     bloc.append(h("div", { class: "sur-titre" }, "Enfants"));
     const e = h("div", { style: "display:flex;flex-wrap:wrap;gap:6px;margin-top:2px" });
-    u.enfants.forEach((c) => e.append(pucePersonne(c)));
+    u.enfants.forEach((c) => {
+      const enveloppe = h("span", { style: "display:inline-flex;gap:4px;align-items:center" },
+        pucePersonne(c),
+        h("button", { class: "bouton secondaire petit",
+          title: "Corriger ses parents / le déplacer",
+          onclick: () => menuEnfant(pid, c) }, "⋯"));
+      e.append(enveloppe);
+    });
     bloc.append(e);
   }
   bloc.append(h("div", { class: "barre-actions", style: "margin-top:6px" },

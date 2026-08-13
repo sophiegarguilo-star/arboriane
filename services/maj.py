@@ -25,6 +25,17 @@ PAGE = "https://sophiegarguilo-star.github.io/arboriane/"
 # Journal des nouveautés, du plus récent au plus ancien. À COMPLÉTER à chaque
 # version livrée (une entrée = ce que l'utilisateur gagne, en clair).
 NOTES = [
+    {"version": "1.10.4", "date": "2026-08-02", "points": [
+        "Onglet Famille : on peut désormais modifier les liens directement là où "
+        "on les voit. À côté de chaque parent, conjoint·e et enfant, de petits "
+        "boutons permettent de « ✎ Changer » (remplacer la personne) ou « ✕ "
+        "Retirer » un parent ou un conjoint·e.",
+        "Chaque enfant a un menu « ⋯ » pour « Changer sa mère », « Changer son "
+        "père » ou « Détacher de ce couple » — pratique, par exemple, quand des "
+        "enfants ont été rattachés au mauvais parent (remariages, deux sœurs "
+        "épousées par deux frères…). Le second parent est conservé et l'enfant "
+        "bascule automatiquement dans le bon couple.",
+    ]},
     {"version": "1.10.3", "date": "2026-08-02", "points": [
         "Éditeur enrichi pour les transcriptions : une petite barre d'outils "
         "(gras, italique, souligné, listes) permet désormais de mettre en forme "
