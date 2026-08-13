@@ -2,8 +2,8 @@
 # Visible via clic droit sur l'exe -> Propriétés -> Détails.
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 10, 3, 0),
-    prodvers=(1, 10, 3, 0),
+    filevers=(1, 10, 4, 0),
+    prodvers=(1, 10, 4, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -18,12 +18,12 @@ VSVersionInfo(
         [
           StringStruct('CompanyName', 'Arboriane'),
           StringStruct('FileDescription', 'Arboriane — atelier de généalogie local et privé'),
-          StringStruct('FileVersion', '1.10.3'),
+          StringStruct('FileVersion', '1.10.4'),
           StringStruct('InternalName', 'Arboriane'),
           StringStruct('LegalCopyright', '© 2026 Arboriane'),
           StringStruct('OriginalFilename', 'Arboriane.exe'),
           StringStruct('ProductName', 'Arboriane'),
-          StringStruct('ProductVersion', '1.10.3'),
+          StringStruct('ProductVersion', '1.10.4'),
         ])
     ]),
     VarFileInfo([VarStruct('Translation', [1036, 1200])])
